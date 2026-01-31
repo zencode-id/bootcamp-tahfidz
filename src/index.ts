@@ -14,6 +14,8 @@ import tahfidzRoutes from "./routes/tahfidz.js";
 import statsRoutes from "./routes/stats.js";
 import classRoutes from "./routes/classes.js";
 import webhookRoutes from "./routes/webhook.js";
+import examRoutes from "./routes/exams.js";
+import reportRoutes from "./routes/reports.js";
 
 // Import DB to initialize on startup
 import "./db/index.js";
@@ -103,6 +105,8 @@ app.get("/", (c) => {
       tahfidz: "/sync/tahfidz",
       stats: "/stats",
       classes: "/classes",
+      exams: "/exams",
+      reports: "/reports",
       webhook: "/webhook",
     },
   });
@@ -124,6 +128,8 @@ app.route("/sync", syncRoutes);
 app.route("/sync/tahfidz", tahfidzRoutes);
 app.route("/stats", statsRoutes);
 app.route("/classes", classRoutes);
+app.route("/exams", examRoutes);
+app.route("/reports", reportRoutes);
 app.route("/webhook", webhookRoutes);
 
 // ============================================

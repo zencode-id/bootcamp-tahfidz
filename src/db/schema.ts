@@ -199,12 +199,173 @@ export const assessments = sqliteTable("assessments", {
 });
 
 // ============================================
+// EXAMS TABLE (Ujian Tahfidz)
+// ============================================
+export const exams = sqliteTable("exams", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn((): string => uuidv4()),
+  name: text("name").notNull(), // e.g., "Ujian Tengah Semester 1", "Ujian Akhir Tahun"
+  description: text("description"),
+  examType: text("exam_type", {
+    enum: ["mid_semester", "end_semester", "monthly", "weekly", "placement"],
+  }).notNull(),
+  classId: text("class_id").references(() => classes.id, {
+    onDelete: "set null",
+  }),
+  surahId: integer("surah_id").references(() => surahs.id), // Optional: specific surah for exam
+  startSurah: integer("start_surah").references(() => surahs.id), // Range start
+  endSurah: integer("end_surah").references(() => surahs.id), // Range end
+  startAyah: integer("start_ayah"),
+  endAyah: integer("end_ayah"),
+  examDate: text("exam_date").notNull(), // YYYY-MM-DD
+  academicYear: text("academic_year").notNull(), // e.g., "2025/2026"
+  semester: text("semester", { enum: ["1", "2"] }).notNull(),
+  passingScore: real("passing_score").notNull().default(70),
+  maxScore: real("max_score").notNull().default(100),
+  createdBy: text("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ============================================
+// EXAM RESULTS TABLE (Hasil Ujian)
+// ============================================
+export const examResults = sqliteTable("exam_results", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn((): string => uuidv4()),
+  examId: text("exam_id")
+    .notNull()
+    .references(() => exams.id, { onDelete: "cascade" }),
+  studentId: text("student_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+
+  // Hafalan scores
+  hafalanScore: real("hafalan_score").notNull().default(0), // 0-100
+  tajwidScore: real("tajwid_score").notNull().default(0), // 0-100
+  fashohahScore: real("fashohah_score").notNull().default(0), // 0-100
+  fluencyScore: real("fluency_score").notNull().default(0), // 0-100
+
+  // Additional scores for comprehensive exam
+  makhorijulHurufScore: real("makhorijul_huruf_score"), // 0-100
+  tartilScore: real("tartil_score"), // 0-100
+
+  // Calculated
+  totalScore: real("total_score").notNull().default(0),
+  grade: text("grade", { enum: ["A", "B", "C", "D", "E"] }),
+  isPassed: integer("is_passed", { mode: "boolean" }).notNull().default(false),
+  rank: integer("rank"), // Rank in class
+
+  // Examiner info
+  examinerId: text("examiner_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  notes: text("notes"),
+  feedback: text("feedback"), // Detailed feedback for student
+
+  examTakenAt: text("exam_taken_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ============================================
+// REPORTS TABLE (Raport/Report Cards)
+// ============================================
+export const reports = sqliteTable("reports", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn((): string => uuidv4()),
+  studentId: text("student_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  classId: text("class_id").references(() => classes.id, {
+    onDelete: "set null",
+  }),
+  academicYear: text("academic_year").notNull(), // e.g., "2025/2026"
+  semester: text("semester", { enum: ["1", "2"] }).notNull(),
+
+  // Attendance Summary
+  totalSessions: integer("total_sessions").notNull().default(0),
+  presentCount: integer("present_count").notNull().default(0),
+  absentCount: integer("absent_count").notNull().default(0),
+  sickCount: integer("sick_count").notNull().default(0),
+  leaveCount: integer("leave_count").notNull().default(0),
+  attendancePercentage: real("attendance_percentage").notNull().default(0),
+
+  // Tahfidz Progress
+  totalAyahsMemorized: integer("total_ayahs_memorized").notNull().default(0),
+  totalNewAyahs: integer("total_new_ayahs").notNull().default(0), // This semester
+  totalMurojaahSessions: integer("total_murojaah_sessions")
+    .notNull()
+    .default(0),
+  currentSurah: integer("current_surah").references(() => surahs.id), // Last surah memorized
+  currentAyah: integer("current_ayah"),
+  targetAyahs: integer("target_ayahs"), // Target for the semester
+  progressPercentage: real("progress_percentage").notNull().default(0),
+
+  // Average Scores (from daily assessments)
+  avgTajwidScore: real("avg_tajwid_score").notNull().default(0),
+  avgFashohahScore: real("avg_fashohah_score").notNull().default(0),
+  avgFluencyScore: real("avg_fluency_score").notNull().default(0),
+  avgTotalScore: real("avg_total_score").notNull().default(0),
+
+  // Exam Scores (from exams)
+  midSemesterScore: real("mid_semester_score"),
+  endSemesterScore: real("end_semester_score"),
+  finalScore: real("final_score").notNull().default(0),
+  finalGrade: text("final_grade", { enum: ["A", "B", "C", "D", "E"] }),
+
+  // Ranking
+  classRank: integer("class_rank"),
+  totalStudents: integer("total_students"),
+
+  // Status
+  status: text("status", { enum: ["draft", "published", "archived"] })
+    .notNull()
+    .default("draft"),
+
+  // Comments
+  teacherNotes: text("teacher_notes"),
+  principalNotes: text("principal_notes"),
+  recommendations: text("recommendations"),
+
+  // Approval
+  approvedBy: text("approved_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  approvedAt: text("approved_at"),
+
+  publishedAt: text("published_at"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ============================================
 // SYNC LOGS TABLE (For tracking GSheet sync)
 // ============================================
 export const syncLogs = sqliteTable("sync_logs", {
   id: text("id")
     .primaryKey()
-    .$defaultFn(() => uuidv4()),
+    .$defaultFn((): string => uuidv4()),
   tableName: text("table_name").notNull(),
   recordId: text("record_id").notNull(),
   action: text("action", { enum: ["create", "update", "delete"] }).notNull(),
@@ -243,6 +404,15 @@ export type NewMemorizationLog = typeof memorizationLogs.$inferInsert;
 export type Assessment = typeof assessments.$inferSelect;
 export type NewAssessment = typeof assessments.$inferInsert;
 
+export type Exam = typeof exams.$inferSelect;
+export type NewExam = typeof exams.$inferInsert;
+
+export type ExamResult = typeof examResults.$inferSelect;
+export type NewExamResult = typeof examResults.$inferInsert;
+
+export type Report = typeof reports.$inferSelect;
+export type NewReport = typeof reports.$inferInsert;
+
 export type SyncLog = typeof syncLogs.$inferSelect;
 export type NewSyncLog = typeof syncLogs.$inferInsert;
 
@@ -252,3 +422,10 @@ export type SessionType = "subuh" | "ziyadah" | "murojaah" | "tahsin";
 export type AttendanceStatus = "present" | "absent" | "sick" | "leave" | "late";
 export type MemorizationType = "ziyadah" | "murojaah";
 export type Grade = "A" | "B" | "C" | "D" | "E";
+export type ExamType =
+  | "mid_semester"
+  | "end_semester"
+  | "monthly"
+  | "weekly"
+  | "placement";
+export type ReportStatus = "draft" | "published" | "archived";
