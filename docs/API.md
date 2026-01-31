@@ -13,8 +13,10 @@ Dokumentasi lengkap untuk semua endpoint API.
 3. [Classes](#classes)
 4. [Attendance Sync](#attendance-sync)
 5. [Tahfidz Sync](#tahfidz-sync)
-6. [Statistics](#statistics)
-7. [Webhooks](#webhooks)
+6. [Exams (Ujian)](#exams-ujian)
+7. [Reports (Raport)](#reports-raport)
+8. [Statistics](#statistics)
+9. [Webhooks](#webhooks)
 
 ---
 
@@ -625,7 +627,608 @@ Mendapatkan daftar 114 surah.
 
 ---
 
-## 📊 Statistics
+## � Exams (Ujian)
+
+### GET /exams
+
+Mendapatkan daftar ujian.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "exam-uuid",
+      "name": "Ujian Tengah Semester 1",
+      "description": "Ujian hafalan semester 1",
+      "examType": "mid_semester",
+      "classId": "class-uuid",
+      "startSurah": 1,
+      "endSurah": 3,
+      "examDate": "2026-02-15",
+      "academicYear": "2025/2026",
+      "semester": "1",
+      "passingScore": 70,
+      "maxScore": 100,
+      "isActive": true,
+      "createdAt": "2026-01-31T05:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### POST /exams
+
+Membuat ujian baru.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "name": "Ujian Tengah Semester 1",
+  "description": "Ujian hafalan semester 1",
+  "examType": "mid_semester",
+  "classId": "class-uuid",
+  "startSurah": 1,
+  "endSurah": 3,
+  "startAyah": 1,
+  "endAyah": 200,
+  "examDate": "2026-02-15",
+  "academicYear": "2025/2026",
+  "semester": "1",
+  "passingScore": 70,
+  "maxScore": 100
+}
+```
+
+**Exam Types:**
+| Type | Deskripsi |
+|------|-----------|
+| `mid_semester` | Ujian Tengah Semester |
+| `end_semester` | Ujian Akhir Semester |
+| `monthly` | Ujian Bulanan |
+| `weekly` | Ujian Mingguan |
+| `placement` | Ujian Penempatan |
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "message": "Exam created successfully",
+  "data": {
+    "id": "exam-uuid",
+    "name": "Ujian Tengah Semester 1",
+    ...
+  }
+}
+```
+
+---
+
+### GET /exams/:id
+
+Mendapatkan detail ujian.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "exam-uuid",
+    "name": "Ujian Tengah Semester 1",
+    "examType": "mid_semester",
+    "examDate": "2026-02-15",
+    "academicYear": "2025/2026",
+    "semester": "1",
+    "passingScore": 70,
+    "class": {
+      "id": "class-uuid",
+      "name": "Halaqah Al-Fatihah"
+    },
+    "resultsCount": 15
+  }
+}
+```
+
+---
+
+### PUT /exams/:id
+
+Update ujian.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:** (partial update)
+
+```json
+{
+  "name": "Ujian Tengah Semester 1 - Revisi",
+  "examDate": "2026-02-20"
+}
+```
+
+---
+
+### DELETE /exams/:id
+
+Hapus ujian (Admin only).
+
+**Headers:** `Authorization: Bearer <token>` (Admin)
+
+---
+
+### GET /exams/:id/results
+
+Mendapatkan semua hasil ujian.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "result-uuid",
+      "examId": "exam-uuid",
+      "studentId": "student-uuid",
+      "hafalanScore": 85,
+      "tajwidScore": 80,
+      "fashohahScore": 82,
+      "fluencyScore": 78,
+      "makhorijulHurufScore": 75,
+      "tartilScore": 80,
+      "totalScore": 80.0,
+      "grade": "B",
+      "isPassed": true,
+      "rank": 3,
+      "feedback": "Perlu perbaikan makhraj huruf",
+      "student": {
+        "id": "student-uuid",
+        "name": "Ahmad Santri",
+        "email": "ahmad@example.com"
+      }
+    }
+  ],
+  "total": 15
+}
+```
+
+---
+
+### POST /exams/:id/results
+
+Menambahkan hasil ujian santri.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "studentId": "student-uuid",
+  "hafalanScore": 85,
+  "tajwidScore": 80,
+  "fashohahScore": 82,
+  "fluencyScore": 78,
+  "makhorijulHurufScore": 75,
+  "tartilScore": 80,
+  "notes": "Catatan penguji",
+  "feedback": "Perlu perbaikan makhraj huruf"
+}
+```
+
+**Score Fields:**
+| Field | Required | Deskripsi |
+|-------|----------|-----------|
+| `hafalanScore` | ✅ | Nilai hafalan (0-100) |
+| `tajwidScore` | ✅ | Nilai tajwid (0-100) |
+| `fashohahScore` | ✅ | Nilai fashohah (0-100) |
+| `fluencyScore` | ✅ | Nilai kelancaran (0-100) |
+| `makhorijulHurufScore` | ❌ | Nilai makhraj (0-100) |
+| `tartilScore` | ❌ | Nilai tartil (0-100) |
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "message": "Exam result created successfully",
+  "data": {
+    "id": "result-uuid",
+    "totalScore": 80.0,
+    "grade": "B",
+    "isPassed": true,
+    ...
+  }
+}
+```
+
+---
+
+### POST /exams/:id/results/bulk
+
+Menambahkan hasil ujian secara bulk.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "results": [
+    {
+      "studentId": "student-uuid-1",
+      "hafalanScore": 85,
+      "tajwidScore": 80,
+      "fashohahScore": 82,
+      "fluencyScore": 78
+    },
+    {
+      "studentId": "student-uuid-2",
+      "hafalanScore": 90,
+      "tajwidScore": 88,
+      "fashohahScore": 85,
+      "fluencyScore": 92
+    }
+  ]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Processed 2 results",
+  "data": {
+    "created": 2,
+    "errors": []
+  }
+}
+```
+
+---
+
+### GET /exams/:id/results/:studentId
+
+Mendapatkan hasil ujian santri tertentu.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "result-uuid",
+    "hafalanScore": 85,
+    "tajwidScore": 80,
+    "fashohahScore": 82,
+    "fluencyScore": 78,
+    "totalScore": 81.25,
+    "grade": "B",
+    "isPassed": true,
+    "rank": 3,
+    "feedback": "Perlu perbaikan makhraj huruf",
+    "exam": {
+      "id": "exam-uuid",
+      "name": "Ujian Tengah Semester 1"
+    },
+    "student": {
+      "id": "student-uuid",
+      "name": "Ahmad Santri"
+    }
+  }
+}
+```
+
+---
+
+## 📊 Reports (Raport)
+
+### GET /reports
+
+Mendapatkan daftar raport.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+| Parameter | Tipe | Deskripsi |
+|-----------|------|-----------|
+| `academicYear` | string | Filter tahun ajaran (e.g., "2025/2026") |
+| `semester` | enum | Filter semester ("1" atau "2") |
+| `classId` | uuid | Filter berdasarkan kelas |
+| `status` | enum | draft, published, archived (Admin/Teacher only) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "report-uuid",
+      "studentId": "student-uuid",
+      "classId": "class-uuid",
+      "academicYear": "2025/2026",
+      "semester": "1",
+      "finalScore": 85.5,
+      "finalGrade": "B",
+      "classRank": 3,
+      "totalStudents": 15,
+      "status": "published",
+      "student": {
+        "id": "student-uuid",
+        "name": "Ahmad Santri"
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### POST /reports/generate
+
+**Auto-generate raport** dari data kehadiran, hafalan, dan ujian.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "academicYear": "2025/2026",
+  "semester": "1",
+  "classId": "class-uuid",
+  "studentIds": ["student-uuid-1", "student-uuid-2"]
+}
+```
+
+| Field          | Required | Deskripsi                           |
+| -------------- | -------- | ----------------------------------- |
+| `academicYear` | ✅       | Tahun ajaran (format: YYYY/YYYY)    |
+| `semester`     | ✅       | Semester ("1" atau "2")             |
+| `classId`      | ❌       | Filter kelas tertentu               |
+| `studentIds`   | ❌       | Daftar santri (jika kosong = semua) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Generated 15 reports",
+  "data": {
+    "generated": 15,
+    "skipped": 2,
+    "errors": []
+  }
+}
+```
+
+**Data yang Auto-Calculate:**
+
+- ✅ Total sesi & persentase kehadiran
+- ✅ Total ayat yang dihafal (ziyadah)
+- ✅ Total sesi murojaah
+- ✅ Rata-rata nilai harian (tajwid, fashohah, kelancaran)
+- ✅ Nilai UTS & UAS (dari exam_results)
+- ✅ Final score (30% harian + 30% UTS + 40% UAS)
+- ✅ Ranking dalam kelas
+
+---
+
+### GET /reports/:id
+
+Mendapatkan detail raport.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "report-uuid",
+    "studentId": "student-uuid",
+    "academicYear": "2025/2026",
+    "semester": "1",
+
+    "totalSessions": 50,
+    "presentCount": 45,
+    "absentCount": 2,
+    "sickCount": 2,
+    "leaveCount": 1,
+    "attendancePercentage": 90.0,
+
+    "totalAyahsMemorized": 150,
+    "totalNewAyahs": 50,
+    "totalMurojaahSessions": 20,
+    "currentSurah": 3,
+    "currentAyah": 50,
+    "progressPercentage": 2.4,
+
+    "avgTajwidScore": 85.5,
+    "avgFashohahScore": 88.2,
+    "avgFluencyScore": 82.1,
+    "avgTotalScore": 85.27,
+
+    "midSemesterScore": 82.5,
+    "endSemesterScore": 88.0,
+    "finalScore": 85.5,
+    "finalGrade": "B",
+
+    "classRank": 3,
+    "totalStudents": 15,
+    "status": "published",
+
+    "teacherNotes": "Santri rajin dan tekun",
+    "recommendations": "Tingkatkan murojaah",
+
+    "student": {
+      "id": "student-uuid",
+      "name": "Ahmad Santri"
+    },
+    "class": {
+      "id": "class-uuid",
+      "name": "Halaqah Al-Fatihah"
+    },
+    "currentSurahInfo": {
+      "id": 3,
+      "name": "Ali Imran"
+    }
+  }
+}
+```
+
+---
+
+### PUT /reports/:id
+
+Update raport.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "teacherNotes": "Santri rajin dan tekun dalam menghafal",
+  "recommendations": "Tingkatkan murojaah dan perbaiki tajwid",
+  "targetAyahs": 100
+}
+```
+
+---
+
+### POST /reports/:id/publish
+
+Publish raport (membuatnya visible untuk santri/wali).
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Report published successfully",
+  "data": {
+    "id": "report-uuid",
+    "status": "published",
+    "approvedBy": "admin-uuid",
+    "approvedAt": "2026-01-31T10:00:00.000Z",
+    "publishedAt": "2026-01-31T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+### POST /reports/publish-bulk
+
+Publish banyak raport sekaligus.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Request Body:**
+
+```json
+{
+  "reportIds": ["report-uuid-1", "report-uuid-2", "report-uuid-3"]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Published 3 reports",
+  "data": {
+    "published": 3
+  }
+}
+```
+
+---
+
+### GET /reports/:id/print
+
+Mendapatkan data raport untuk dicetak.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "report": { ... },
+    "student": {
+      "id": "student-uuid",
+      "name": "Ahmad Santri",
+      "email": "ahmad@example.com",
+      "phone": "08123456789",
+      "address": "Jl. Contoh No. 1"
+    },
+    "parent": {
+      "id": "parent-uuid",
+      "name": "Bapak Ahmad",
+      "phone": "08198765432"
+    },
+    "class": {
+      "id": "class-uuid",
+      "name": "Halaqah Al-Fatihah"
+    },
+    "teacher": {
+      "id": "teacher-uuid",
+      "name": "Ustadz Ahmad"
+    },
+    "currentSurah": {
+      "id": 3,
+      "name": "Ali Imran",
+      "arabicName": "آل عمران"
+    },
+    "approver": {
+      "id": "admin-uuid",
+      "name": "Admin"
+    },
+    "printedAt": "2026-01-31T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### DELETE /reports/:id
+
+Hapus raport.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+---
+
+## �📊 Statistics
 
 ### GET /stats/progress/:studentId
 

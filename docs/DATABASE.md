@@ -16,14 +16,22 @@ erDiagram
     USERS ||--o{ ATTENDANCE : "has"
     USERS ||--o{ MEMORIZATION_LOGS : "records"
     USERS ||--o{ ASSESSMENTS : "assesses"
+    USERS ||--o{ EXAMS : "creates"
+    USERS ||--o{ EXAM_RESULTS : "takes"
+    USERS ||--o{ REPORTS : "has"
 
     CLASSES ||--o{ CLASS_MEMBERS : "has"
     CLASSES ||--o{ ATTENDANCE : "for"
     CLASSES ||--o{ MEMORIZATION_LOGS : "in"
+    CLASSES ||--o{ EXAMS : "has"
+    CLASSES ||--o{ REPORTS : "generates"
 
     SURAHS ||--o{ MEMORIZATION_LOGS : "referenced_by"
+    SURAHS ||--o{ EXAMS : "covers"
 
     MEMORIZATION_LOGS ||--o| ASSESSMENTS : "has"
+
+    EXAMS ||--o{ EXAM_RESULTS : "has"
 
     SYNC_LOGS }o--|| USERS : "tracks"
 
@@ -118,6 +126,72 @@ erDiagram
         datetime updated_at
     }
 
+    EXAMS {
+        uuid id PK
+        string name
+        string description
+        enum exam_type "mid_semester|end_semester|monthly|weekly|placement"
+        uuid class_id FK
+        int surah_id FK
+        int start_surah FK
+        int end_surah FK
+        date exam_date
+        string academic_year
+        enum semester "1|2"
+        float passing_score
+        float max_score
+        uuid created_by FK
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    EXAM_RESULTS {
+        uuid id PK
+        uuid exam_id FK
+        uuid student_id FK
+        float hafalan_score
+        float tajwid_score
+        float fashohah_score
+        float fluency_score
+        float makhorijul_huruf_score
+        float tartil_score
+        float total_score
+        enum grade "A|B|C|D|E"
+        boolean is_passed
+        int rank
+        uuid examiner_id FK
+        string feedback
+        datetime exam_taken_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    REPORTS {
+        uuid id PK
+        uuid student_id FK
+        uuid class_id FK
+        string academic_year
+        enum semester "1|2"
+        int total_sessions
+        int present_count
+        float attendance_percentage
+        int total_ayahs_memorized
+        float avg_tajwid_score
+        float avg_fashohah_score
+        float avg_fluency_score
+        float mid_semester_score
+        float end_semester_score
+        float final_score
+        enum final_grade "A|B|C|D|E"
+        int class_rank
+        enum status "draft|published|archived"
+        uuid approved_by FK
+        datetime published_at
+        datetime created_at
+        datetime updated_at
+    }
+
     SYNC_LOGS {
         uuid id PK
         string table_name
@@ -143,8 +217,11 @@ erDiagram
 | 4   | `surahs`            | Data referensi 114 surah Al-Quran         | 6            |
 | 5   | `attendance`        | Catatan kehadiran                         | 13           |
 | 6   | `memorization_logs` | Catatan hafalan (ziyadah/murojaah)        | 14           |
-| 7   | `assessments`       | Penilaian hafalan                         | 11           |
-| 8   | `sync_logs`         | Log sinkronisasi dengan Google Sheets     | 9            |
+| 7   | `assessments`       | Penilaian hafalan harian                  | 11           |
+| 8   | `exams`             | Data ujian tahfidz                        | 17           |
+| 9   | `exam_results`      | Hasil ujian per santri                    | 18           |
+| 10  | `reports`           | Raport semester santri                    | 28           |
+| 11  | `sync_logs`         | Log sinkronisasi dengan Google Sheets     | 9            |
 
 ---
 
