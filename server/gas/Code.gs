@@ -20,7 +20,7 @@
 
 // Configuration
 const CONFIG = {
-  API_KEY: "your-api-key-here", // Must match GAS_API_KEY in .env
+  API_KEY: "tahfidz-gas-secret-2024-xyz123", // Must match GAS_API_KEY in .env
   API_ENDPOINT: "http://your-server-url:3000/webhook/gas", // Your backend URL
   SPREADSHEET_ID: SpreadsheetApp.getActiveSpreadsheet().getId(),
 };

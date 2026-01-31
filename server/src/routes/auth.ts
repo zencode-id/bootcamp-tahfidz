@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import bcrypt from "bcryptjs";
 import { eq, and, sql } from "drizzle-orm";
-import { db, users } from "../db/index.js";
+import { db, users, otpCodes } from "../db/index.js";
 import {
   loginSchema,
   registerSchema,
@@ -12,6 +12,7 @@ import {
   authMiddleware,
   adminOnly,
 } from "../middleware/auth.js";
+import { sendOtpEmail } from "../services/brevo.js";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
 
@@ -68,6 +69,9 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
 // ============================================
 // POST /auth/login
 // ============================================
+// ============================================
+// POST /auth/login (Step 1: Validate credentials & Send OTP)
+// ============================================
 auth.post("/login", zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
@@ -92,8 +96,76 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     throw new HTTPException(401, { message: "Invalid email or password" });
   }
 
-  // Generate token
+  // Generate OTP
+  const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
+
+  // Save OTP to DB
+  await db.insert(otpCodes).values({
+    userId: user.id,
+    code: otp,
+    expiresAt: expiresAt.getTime(), // Store as timestamp
+  });
+
+  // Send OTP via Brevo
+  try {
+    await sendOtpEmail(user.email, otp, user.name);
+  } catch (error) {
+    console.error("Failed to send email", error);
+    // For dev, we might still want to proceed or return error?
+    // throw new HTTPException(500, { message: "Failed to send OTP email" });
+  }
+
+  return c.json({
+    success: true,
+    message: "OTP sent to email",
+    data: {
+      email: user.email,
+      role: user.role, // Return role so frontend knows where to redirect after verification? Or maybe wait until verify to return sensitive info.
+    },
+  });
+});
+
+// ============================================
+// POST /auth/verify-otp (Step 2: Validate OTP & Issue Token)
+// ============================================
+auth.post("/verify-otp", async (c) => {
+  const { email, code } = await c.req.json();
+
+  if (!email || !code) {
+    throw new HTTPException(400, { message: "Email and code are required" });
+  }
+
+  // Find user
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (!user) {
+    throw new HTTPException(404, { message: "User not found" });
+  }
+
+  // Verify OTP
+  // Get latest active OTP for user
+  const existingOtp = await db.query.otpCodes.findFirst({
+    where: and(eq(otpCodes.userId, user.id), eq(otpCodes.code, code)),
+    orderBy: (otpCodes, { desc }) => [desc(otpCodes.createdAt)],
+  });
+
+  if (!existingOtp) {
+    throw new HTTPException(400, { message: "Invalid OTP" });
+  }
+
+  // Check expiry
+  if (existingOtp.expiresAt < Date.now()) {
+    throw new HTTPException(400, { message: "OTP expired" });
+  }
+
+  // Generate Request Token (JWT)
   const token = generateToken(user);
+
+  // Cleanup used OTP (optional, or mark as used)
+  await db.delete(otpCodes).where(eq(otpCodes.id, existingOtp.id));
 
   return c.json({
     success: true,

@@ -36,6 +36,23 @@ export const users = sqliteTable("users", {
 });
 
 // ============================================
+// OTP CODES TABLE
+// ============================================
+export const otpCodes = sqliteTable("otp_codes", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => uuidv4()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  expiresAt: integer("expires_at").notNull(), // Timestamp in ms
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+// ============================================
 // CLASSES/HALAQAH TABLE
 // ============================================
 export const classes = sqliteTable("classes", {
@@ -385,6 +402,9 @@ export const syncLogs = sqliteTable("sync_logs", {
 // ============================================
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type OtpCode = typeof otpCodes.$inferSelect;
+export type NewOtpCode = typeof otpCodes.$inferInsert;
 
 export type Class = typeof classes.$inferSelect;
 export type NewClass = typeof classes.$inferInsert;

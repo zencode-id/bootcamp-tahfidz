@@ -33,6 +33,7 @@
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.7",
     "jsonwebtoken": "^9.0.3",
+    "sib-api-v3-sdk": "^8.5.0",
     "uuid": "^13.0.0",
     "zod": "^3.25.76"
   },
