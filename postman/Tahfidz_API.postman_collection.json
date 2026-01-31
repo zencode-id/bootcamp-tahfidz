@@ -105,9 +105,35 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/auth/users",
+              "raw": "{{baseUrl}}/auth/users?page=1&limit=10&role=student&is_active=true&q=",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "users"]
+              "path": ["auth", "users"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "role",
+                  "value": "student",
+                  "description": "Filter by role (student/teacher/parent/admin)",
+                  "disabled": true
+                },
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "description": "Filter by active status (true/false/1/0)",
+                  "disabled": true
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Search by name or email",
+                  "disabled": true
+                }
+              ]
             }
           }
         }
