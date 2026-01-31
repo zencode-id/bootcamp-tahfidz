@@ -784,62 +784,34 @@ async function seed() {
       "✅ Sample teacher created: teacher@tahfidz.app / teacher123\n",
     );
 
-    // Create more sample teachers
-    console.log("👨‍🏫 Creating 10 sample teachers...");
-    const teachers = [];
-    for (let i = 1; i <= 10; i++) {
-      teachers.push({
-        name: `Ustadz ${i}`,
-        email: `teacher${i}@tahfidz.app`,
+    // Create Active Teacher
+    console.log("👨‍🏫 Creating Active Teacher...");
+    await db
+      .insert(users)
+      .values({
+        name: "Ustadz Active",
+        email: "teacher_active@tahfidz.app",
         password: teacherPassword,
-        role: "teacher" as const,
-        isActive: i % 5 !== 0, // 20% teachers are inactive (Teacher 5, 10)
-        createdAt: new Date(
-          Date.now() - Math.floor(Math.random() * 10000000000),
-        ).toISOString(),
-      });
-    }
+        role: "teacher",
+        isActive: true,
+      })
+      .onConflictDoNothing();
 
-    for (const teacher of teachers) {
-      try {
-        await db.insert(users).values(teacher).onConflictDoNothing();
-      } catch (e) {
-        // Ignore duplicates
-      }
-    }
-    console.log("✅ 10 Sample teachers created (some inactive)\n");
+    // Create Inactive Teacher
+    console.log("👨‍🏫 Creating Inactive Teacher...");
+    await db
+      .insert(users)
+      .values({
+        name: "Ustadz Inactive",
+        email: "teacher_inactive@tahfidz.app",
+        password: teacherPassword,
+        role: "teacher",
+        isActive: false,
+      })
+      .onConflictDoNothing();
 
-    // Create sample students (Bulk)
-    console.log("🎓 Creating 50 sample students...");
-    const studentPassword = await bcrypt.hash("student123", 12);
-    const students = [];
-
-    for (let i = 1; i <= 50; i++) {
-      students.push({
-        name: `Santri ${i}`,
-        email: `student${i}@tahfidz.app`,
-        password: studentPassword,
-        role: "student" as const,
-        isActive: i % 10 !== 0, // 10% students are inactive
-        createdAt: new Date(
-          Date.now() - Math.floor(Math.random() * 10000000000),
-        ).toISOString(),
-      });
-    }
-
-    // Insert individually to handle conflicts easily or batch if supported
-    // Using simple loop for SQLite compatibility safety
-    let createdCount = 0;
-    for (const student of students) {
-      try {
-        await db.insert(users).values(student).onConflictDoNothing();
-        createdCount++;
-      } catch (e) {
-        // Ignore duplicates
-      }
-    }
-
-    console.log(`✅ ${createdCount} Sample students created/verified\n`);
+    console.log("✅ Active & Inactive teachers created\n");
+    console.log("ℹ️ Student data cleared (no students seeded)\n");
 
     console.log("🎉 Database seed completed successfully!");
   } catch (error) {
