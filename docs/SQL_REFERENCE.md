@@ -170,6 +170,138 @@ CREATE INDEX idx_sync_logs_status ON sync_logs(sync_status);
 CREATE INDEX idx_sync_logs_table_record ON sync_logs(table_name, record_id);
 ```
 
+### Exams (Ujian)
+
+```sql
+CREATE TABLE exams (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    name TEXT NOT NULL,
+    description TEXT,
+    exam_type TEXT NOT NULL CHECK (exam_type IN ('mid_semester', 'end_semester', 'monthly', 'weekly', 'placement')),
+    class_id TEXT REFERENCES classes(id) ON DELETE SET NULL,
+    surah_id INTEGER REFERENCES surahs(id),
+    start_surah INTEGER,
+    end_surah INTEGER,
+    start_ayah INTEGER,
+    end_ayah INTEGER,
+    exam_date TEXT NOT NULL,
+    academic_year TEXT NOT NULL,
+    semester TEXT NOT NULL CHECK (semester IN ('1', '2')),
+    passing_score REAL NOT NULL DEFAULT 70,
+    max_score REAL NOT NULL DEFAULT 100,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_exams_class_id ON exams(class_id);
+CREATE INDEX idx_exams_exam_date ON exams(exam_date);
+CREATE INDEX idx_exams_academic_year ON exams(academic_year, semester);
+CREATE INDEX idx_exams_exam_type ON exams(exam_type);
+```
+
+### Exam Results (Hasil Ujian)
+
+```sql
+CREATE TABLE exam_results (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    exam_id TEXT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    hafalan_score REAL NOT NULL DEFAULT 0 CHECK (hafalan_score >= 0 AND hafalan_score <= 100),
+    tajwid_score REAL NOT NULL DEFAULT 0 CHECK (tajwid_score >= 0 AND tajwid_score <= 100),
+    fashohah_score REAL NOT NULL DEFAULT 0 CHECK (fashohah_score >= 0 AND fashohah_score <= 100),
+    fluency_score REAL NOT NULL DEFAULT 0 CHECK (fluency_score >= 0 AND fluency_score <= 100),
+    makhorijul_huruf_score REAL CHECK (makhorijul_huruf_score >= 0 AND makhorijul_huruf_score <= 100),
+    tartil_score REAL CHECK (tartil_score >= 0 AND tartil_score <= 100),
+    total_score REAL NOT NULL DEFAULT 0,
+    grade TEXT CHECK (grade IN ('A', 'B', 'C', 'D', 'E')),
+    is_passed INTEGER NOT NULL DEFAULT 0,
+    rank INTEGER,
+    examiner_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    feedback TEXT,
+    exam_taken_at TEXT DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(exam_id, student_id)
+);
+
+CREATE INDEX idx_exam_results_exam_id ON exam_results(exam_id);
+CREATE INDEX idx_exam_results_student_id ON exam_results(student_id);
+CREATE INDEX idx_exam_results_grade ON exam_results(grade);
+CREATE INDEX idx_exam_results_rank ON exam_results(rank);
+```
+
+### Reports (Raport)
+
+```sql
+CREATE TABLE reports (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    class_id TEXT REFERENCES classes(id) ON DELETE SET NULL,
+    teacher_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    academic_year TEXT NOT NULL,
+    semester TEXT NOT NULL CHECK (semester IN ('1', '2')),
+
+    -- Attendance Summary
+    total_sessions INTEGER DEFAULT 0,
+    present_count INTEGER DEFAULT 0,
+    absent_count INTEGER DEFAULT 0,
+    sick_count INTEGER DEFAULT 0,
+    leave_count INTEGER DEFAULT 0,
+    late_count INTEGER DEFAULT 0,
+    attendance_percentage REAL DEFAULT 0,
+
+    -- Tahfidz Progress
+    total_ayahs_memorized INTEGER DEFAULT 0,
+    total_new_ayahs INTEGER DEFAULT 0,
+    total_murojaah_sessions INTEGER DEFAULT 0,
+    current_surah INTEGER REFERENCES surahs(id),
+    current_ayah INTEGER,
+    progress_percentage REAL DEFAULT 0,
+
+    -- Daily Assessment Scores
+    avg_tajwid_score REAL DEFAULT 0,
+    avg_fashohah_score REAL DEFAULT 0,
+    avg_fluency_score REAL DEFAULT 0,
+    avg_total_score REAL DEFAULT 0,
+
+    -- Exam Scores
+    mid_semester_score REAL,
+    end_semester_score REAL,
+    final_score REAL DEFAULT 0,
+    final_grade TEXT CHECK (final_grade IN ('A', 'B', 'C', 'D', 'E')),
+
+    -- Ranking
+    class_rank INTEGER,
+    total_students INTEGER,
+
+    -- Status
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+
+    -- Notes
+    teacher_notes TEXT,
+    recommendations TEXT,
+    target_ayahs INTEGER,
+
+    -- Approval
+    approved_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TEXT,
+    published_at TEXT,
+
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(student_id, academic_year, semester)
+);
+
+CREATE INDEX idx_reports_student_id ON reports(student_id);
+CREATE INDEX idx_reports_class_id ON reports(class_id);
+CREATE INDEX idx_reports_academic_year ON reports(academic_year, semester);
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX idx_reports_class_rank ON reports(class_id, class_rank);
+```
+
 ---
 
 ## 📊 Common Queries
@@ -291,6 +423,112 @@ FROM classes c
 WHERE c.is_active = 1;
 ```
 
+### Exam Results with Ranking
+
+```sql
+-- Get exam results with ranking
+SELECT
+    er.id,
+    er.student_id,
+    u.name as student_name,
+    er.hafalan_score,
+    er.tajwid_score,
+    er.fashohah_score,
+    er.fluency_score,
+    er.total_score,
+    er.grade,
+    er.is_passed,
+    RANK() OVER (ORDER BY er.total_score DESC) as rank
+FROM exam_results er
+JOIN users u ON er.student_id = u.id
+WHERE er.exam_id = :exam_id
+ORDER BY er.total_score DESC;
+```
+
+### Student Exam History
+
+```sql
+-- Get all exams and scores for a student
+SELECT
+    e.id as exam_id,
+    e.name as exam_name,
+    e.exam_type,
+    e.exam_date,
+    e.academic_year,
+    e.semester,
+    er.total_score,
+    er.grade,
+    er.is_passed,
+    er.rank
+FROM exams e
+JOIN exam_results er ON e.id = er.exam_id
+WHERE er.student_id = :student_id
+ORDER BY e.exam_date DESC;
+```
+
+### Generate Report Data
+
+```sql
+-- Get data for report generation
+SELECT
+    u.id as student_id,
+    u.name as student_name,
+
+    -- Attendance
+    (SELECT COUNT(*) FROM attendance WHERE student_id = u.id
+        AND strftime('%Y', date) || '/' || (CAST(strftime('%Y', date) AS INTEGER) + 1) = :academic_year
+        AND CASE WHEN :semester = '1' THEN strftime('%m', date) BETWEEN '07' AND '12'
+                 ELSE strftime('%m', date) BETWEEN '01' AND '06' END) as total_sessions,
+    (SELECT COUNT(*) FROM attendance WHERE student_id = u.id AND status = 'present'
+        AND strftime('%Y', date) || '/' || (CAST(strftime('%Y', date) AS INTEGER) + 1) = :academic_year) as present_count,
+
+    -- Tahfidz Progress
+    (SELECT COALESCE(SUM(end_ayah - start_ayah + 1), 0) FROM memorization_logs
+        WHERE student_id = u.id AND type = 'ziyadah') as total_ayahs,
+
+    -- Assessment Scores
+    (SELECT ROUND(AVG(a.tajwid_score), 2) FROM assessments a
+        JOIN memorization_logs ml ON a.log_id = ml.id
+        WHERE ml.student_id = u.id) as avg_tajwid,
+    (SELECT ROUND(AVG(a.fashohah_score), 2) FROM assessments a
+        JOIN memorization_logs ml ON a.log_id = ml.id
+        WHERE ml.student_id = u.id) as avg_fashohah,
+    (SELECT ROUND(AVG(a.fluency_score), 2) FROM assessments a
+        JOIN memorization_logs ml ON a.log_id = ml.id
+        WHERE ml.student_id = u.id) as avg_fluency,
+
+    -- Exam Scores
+    (SELECT total_score FROM exam_results er
+        JOIN exams e ON er.exam_id = e.id
+        WHERE er.student_id = u.id AND e.exam_type = 'mid_semester'
+        AND e.academic_year = :academic_year AND e.semester = :semester) as mid_semester_score,
+    (SELECT total_score FROM exam_results er
+        JOIN exams e ON er.exam_id = e.id
+        WHERE er.student_id = u.id AND e.exam_type = 'end_semester'
+        AND e.academic_year = :academic_year AND e.semester = :semester) as end_semester_score
+
+FROM users u
+WHERE u.role = 'student' AND u.is_active = 1;
+```
+
+### Report Summary by Class
+
+```sql
+-- Get published reports summary by class
+SELECT
+    c.id as class_id,
+    c.name as class_name,
+    COUNT(r.id) as total_reports,
+    SUM(CASE WHEN r.status = 'draft' THEN 1 ELSE 0 END) as draft_count,
+    SUM(CASE WHEN r.status = 'published' THEN 1 ELSE 0 END) as published_count,
+    ROUND(AVG(r.final_score), 2) as avg_final_score,
+    ROUND(AVG(r.attendance_percentage), 2) as avg_attendance
+FROM classes c
+LEFT JOIN reports r ON c.id = r.class_id
+WHERE r.academic_year = :academic_year AND r.semester = :semester
+GROUP BY c.id, c.name;
+```
+
 ---
 
 ## 🔄 Triggers (Optional)
@@ -374,4 +612,4 @@ PRAGMA integrity_check;
 
 ---
 
-_SQL Reference untuk Tahfidz Bootcamp API v1.0.0_
+_SQL Reference untuk Tahfidz Bootcamp API v1.1.0_

@@ -29,27 +29,40 @@ Selamat datang di dokumentasi lengkap untuk Tahfidz Bootcamp API.
 │    └────┬─────┘                                        │         │
 │         │                                              │         │
 │         │  ┌───────────────┐                          │         │
-│         └──►  ATTENDANCE   │◄─────────────────────────┘         │
-│            │               │                                     │
-│            │ Subuh/Ziyadah │                                     │
-│            │ Murojaah/     │                                     │
-│            │ Tahsin        │                                     │
-│            └───────────────┘                                     │
-│                                                                  │
-│         ┌────────────────────┐        ┌──────────────┐          │
-│         │  MEMORIZATION_LOGS │───────►│  ASSESSMENTS │          │
-│         │                    │        │              │          │
-│         │  Ziyadah/Murojaah  │        │ Tajwid       │          │
-│         │  Surah + Ayat      │        │ Fashohah     │          │
-│         └────────┬───────────┘        │ Fluency      │          │
-│                  │                    └──────────────┘          │
-│                  │                                               │
-│                  ▼                                               │
-│         ┌──────────────┐                                        │
-│         │    SURAHS    │                                        │
-│         │   (1-114)    │                                        │
-│         │  Al-Quran    │                                        │
-│         └──────────────┘                                        │
+│         ├──►  ATTENDANCE   │◄─────────────────────────┘         │
+│         │  │               │                                     │
+│         │  │ Subuh/Ziyadah │                                     │
+│         │  │ Murojaah/     │                                     │
+│         │  │ Tahsin        │                                     │
+│         │  └───────────────┘                                     │
+│         │                                                        │
+│         │  ┌────────────────────┐        ┌──────────────┐       │
+│         ├──►  MEMORIZATION_LOGS │───────►│  ASSESSMENTS │       │
+│         │  │                    │        │              │       │
+│         │  │  Ziyadah/Murojaah  │        │ Tajwid       │       │
+│         │  │  Surah + Ayat      │        │ Fashohah     │       │
+│         │  └────────┬───────────┘        │ Fluency      │       │
+│         │           │                    └──────────────┘       │
+│         │           ▼                                            │
+│         │  ┌──────────────┐                                     │
+│         │  │    SURAHS    │                                     │
+│         │  │   (1-114)    │                                     │
+│         │  │  Al-Quran    │                                     │
+│         │  └──────────────┘                                     │
+│         │                                                        │
+│         │  ┌──────────────┐        ┌───────────────┐            │
+│         ├──►    EXAMS     │───────►│ EXAM_RESULTS  │            │
+│         │  │              │        │               │            │
+│         │  │ UTS/UAS      │        │ Nilai Ujian   │            │
+│         │  │ Bulanan      │        │ Grade/Rank    │            │
+│         │  └──────────────┘        └───────────────┘            │
+│         │                                                        │
+│         │  ┌────────────────────────────────────────┐           │
+│         └──►           REPORTS (RAPORT)             │           │
+│            │                                        │           │
+│            │  Kehadiran + Hafalan + Nilai + Ranking │           │
+│            │  Auto-generate + Publish Workflow      │           │
+│            └────────────────────────────────────────┘           │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -58,25 +71,28 @@ Selamat datang di dokumentasi lengkap untuk Tahfidz Bootcamp API.
 
 ## 🔑 Role-Based Access Control (RBAC)
 
-| Role        | Akses                                        |
-| ----------- | -------------------------------------------- |
-| **Admin**   | Full access ke semua resource                |
-| **Teacher** | Kelola kehadiran & hafalan kelas yang diajar |
-| **Parent**  | Lihat data anak-anaknya saja                 |
-| **Student** | Lihat data diri sendiri saja                 |
+| Role        | Akses                                              |
+| ----------- | -------------------------------------------------- |
+| **Admin**   | Full access ke semua resource                      |
+| **Teacher** | Kelola kehadiran, hafalan, ujian & raport kelasnya |
+| **Parent**  | Lihat data anak-anaknya (termasuk raport)          |
+| **Student** | Lihat data diri sendiri (termasuk raport)          |
 
 ---
 
 ## 📊 Statistik Database
 
-| Tabel               | Deskripsi       | Estimasi Data |
-| ------------------- | --------------- | ------------- |
-| `users`             | Pengguna sistem | 500+          |
-| `classes`           | Kelas/Halaqah   | 20+           |
-| `surahs`            | Surah Al-Quran  | 114 (static)  |
-| `attendance`        | Kehadiran       | +100/hari     |
-| `memorization_logs` | Catatan hafalan | +50/hari      |
-| `assessments`       | Penilaian       | +50/hari      |
+| Tabel               | Deskripsi        | Estimasi Data |
+| ------------------- | ---------------- | ------------- |
+| `users`             | Pengguna sistem  | 500+          |
+| `classes`           | Kelas/Halaqah    | 20+           |
+| `surahs`            | Surah Al-Quran   | 114 (static)  |
+| `attendance`        | Kehadiran        | +100/hari     |
+| `memorization_logs` | Catatan hafalan  | +50/hari      |
+| `assessments`       | Penilaian harian | +50/hari      |
+| `exams`             | Ujian tahfidz    | +10/semester  |
+| `exam_results`      | Hasil ujian      | +500/semester |
+| `reports`           | Raport santri    | +500/semester |
 
 ---
 
@@ -86,9 +102,27 @@ Selamat datang di dokumentasi lengkap untuk Tahfidz Bootcamp API.
 - **Health Check**: `GET /health`
 - **API Info**: `GET /`
 
+### Endpoint Utama
+
+| Endpoint   | Deskripsi                        |
+| ---------- | -------------------------------- |
+| `/auth`    | Authentication & User Management |
+| `/classes` | Manajemen Kelas                  |
+| `/sync`    | Attendance & Tahfidz Sync        |
+| `/exams`   | Manajemen Ujian & Hasil          |
+| `/reports` | Manajemen Raport                 |
+| `/stats`   | Statistics & Leaderboard         |
+| `/webhook` | Google Sheets Integration        |
+
 ---
 
 ## 📝 Changelog
+
+### v1.1.0 (2026-01-31)
+
+- ✅ **Exams (Ujian)**: CRUD ujian, input hasil, ranking otomatis
+- ✅ **Reports (Raport)**: Auto-generate dari data, publish workflow
+- ✅ **Google Sheets**: Sync exams, exam_results, dan reports
 
 ### v1.0.0 (2026-01-31)
 
@@ -102,4 +136,4 @@ Selamat datang di dokumentasi lengkap untuk Tahfidz Bootcamp API.
 
 ---
 
-_Dokumentasi ini dibuat untuk Tahfidz Bootcamp API v1.0.0_
+_Dokumentasi ini dibuat untuk Tahfidz Bootcamp API v1.1.0_
