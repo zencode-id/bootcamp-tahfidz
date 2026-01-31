@@ -424,3 +424,201 @@ function manualSyncToAPI() {
 
   logSync("MANUAL_SYNC", "gsheet", { sheets: sheets.map((s) => s.name) });
 }
+
+/**
+ * SETUP SHEETS - Run this first to create all required sheets
+ * Go to Apps Script Editor > Run > setupSheets
+ */
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Define all sheets with their headers
+  const sheetsConfig = [
+    {
+      name: SHEETS.ATTENDANCE,
+      headers: HEADERS.ATTENDANCE,
+      description: "Catatan kehadiran santri",
+    },
+    {
+      name: SHEETS.MEMORIZATION_LOGS,
+      headers: HEADERS.MEMORIZATION_LOGS,
+      description: "Catatan hafalan (ziyadah/murojaah)",
+    },
+    {
+      name: SHEETS.ASSESSMENTS,
+      headers: HEADERS.ASSESSMENTS,
+      description: "Penilaian hafalan",
+    },
+    {
+      name: SHEETS.SYNC_LOG,
+      headers: ["Timestamp", "Action", "Source", "Details"],
+      description: "Log sinkronisasi",
+    },
+  ];
+
+  const createdSheets = [];
+  const existingSheets = [];
+
+  for (const config of sheetsConfig) {
+    let sheet = ss.getSheetByName(config.name);
+
+    if (!sheet) {
+      // Create new sheet
+      sheet = ss.insertSheet(config.name);
+      createdSheets.push(config.name);
+    } else {
+      existingSheets.push(config.name);
+    }
+
+    // Set headers
+    sheet.getRange(1, 1, 1, config.headers.length).setValues([config.headers]);
+
+    // Format headers
+    const headerRange = sheet.getRange(1, 1, 1, config.headers.length);
+    headerRange.setFontWeight("bold");
+    headerRange.setBackground("#4285f4");
+    headerRange.setFontColor("#ffffff");
+    headerRange.setHorizontalAlignment("center");
+
+    // Freeze header row
+    sheet.setFrozenRows(1);
+
+    // Auto-resize columns
+    for (let i = 1; i <= config.headers.length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    // Set minimum column width
+    for (let i = 1; i <= config.headers.length; i++) {
+      if (sheet.getColumnWidth(i) < 100) {
+        sheet.setColumnWidth(i, 100);
+      }
+    }
+  }
+
+  // Create README sheet with instructions
+  let readmeSheet = ss.getSheetByName("README");
+  if (!readmeSheet) {
+    readmeSheet = ss.insertSheet("README");
+
+    const instructions = [
+      ["🕋 TAHFIDZ BOOTCAMP - GOOGLE SHEETS SYNC"],
+      [""],
+      ["📋 SHEETS YANG TERSEDIA:"],
+      ["1. Attendance - Catatan kehadiran santri"],
+      ["2. MemorizationLogs - Catatan hafalan (ziyadah/murojaah)"],
+      ["3. Assessments - Penilaian hafalan"],
+      ["4. SyncLog - Log aktivitas sinkronisasi"],
+      [""],
+      ["⚙️ KONFIGURASI:"],
+      ["1. Buka Extensions > Apps Script"],
+      ["2. Edit CONFIG.API_KEY dengan key yang sama di .env"],
+      ["3. Edit CONFIG.API_ENDPOINT dengan URL backend Anda"],
+      ["4. Deploy > New Deployment > Web App"],
+      [""],
+      ["🔄 SINKRONISASI:"],
+      ["- Data otomatis sync saat ada edit di sheet"],
+      ["- Jalankan manualSyncToAPI() untuk sync manual"],
+      [""],
+      ["📝 CATATAN:"],
+      ["- Jangan hapus atau rename sheet yang sudah ada"],
+      ["- Jangan edit kolom ID secara manual"],
+      ["- Baris pertama (header) tidak boleh diubah"],
+    ];
+
+    readmeSheet.getRange(1, 1, instructions.length, 1).setValues(instructions);
+    readmeSheet.getRange(1, 1).setFontSize(14).setFontWeight("bold");
+    readmeSheet.setColumnWidth(1, 500);
+
+    createdSheets.push("README");
+  }
+
+  // Move README to first position
+  ss.setActiveSheet(readmeSheet);
+  ss.moveActiveSheet(1);
+
+  // Log result
+  const result = {
+    created: createdSheets,
+    existing: existingSheets,
+    total: sheetsConfig.length + 1,
+  };
+
+  Logger.log("Setup completed: " + JSON.stringify(result));
+
+  // Show alert
+  SpreadsheetApp.getUi().alert(
+    "Setup Selesai! ✅\n\n" +
+      "Sheet dibuat: " +
+      createdSheets.join(", ") +
+      "\n" +
+      "Sheet sudah ada: " +
+      existingSheets.join(", ") +
+      "\n\n" +
+      "Selanjutnya:\n" +
+      "1. Buka Extensions > Apps Script\n" +
+      "2. Edit CONFIG (API_KEY dan API_ENDPOINT)\n" +
+      "3. Deploy sebagai Web App",
+  );
+
+  return result;
+}
+
+/**
+ * Create custom menu when spreadsheet opens
+ */
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("🕋 Tahfidz Sync")
+    .addItem("📋 Setup Sheets", "setupSheets")
+    .addItem("🔄 Manual Sync to API", "manualSyncToAPI")
+    .addItem("📊 View Sync Log", "viewSyncLog")
+    .addSeparator()
+    .addItem("ℹ️ About", "showAbout")
+    .addToUi();
+}
+
+/**
+ * View sync log
+ */
+function viewSyncLog() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logSheet = ss.getSheetByName(SHEETS.SYNC_LOG);
+
+  if (logSheet) {
+    ss.setActiveSheet(logSheet);
+  } else {
+    SpreadsheetApp.getUi().alert(
+      "SyncLog sheet tidak ditemukan. Jalankan Setup Sheets terlebih dahulu.",
+    );
+  }
+}
+
+/**
+ * Show about dialog
+ */
+function showAbout() {
+  const html = HtmlService.createHtmlOutput(
+    `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>🕋 Tahfidz Bootcamp Sync</h2>
+      <p><strong>Version:</strong> 1.0.0</p>
+      <p><strong>Description:</strong> Google Sheets integration for Tahfidz Bootcamp API</p>
+      <hr>
+      <h3>Features:</h3>
+      <ul>
+        <li>✅ Bidirectional sync with backend</li>
+        <li>✅ Auto-sync on edit</li>
+        <li>✅ Manual sync support</li>
+        <li>✅ Sync logging</li>
+      </ul>
+      <hr>
+      <p><em>© 2026 Zencode ID</em></p>
+    </div>
+  `,
+  )
+    .setWidth(400)
+    .setHeight(350);
+
+  SpreadsheetApp.getUi().showModalDialog(html, "About Tahfidz Sync");
+}

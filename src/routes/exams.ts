@@ -229,7 +229,7 @@ examRoutes.get("/:id/results", async (c) => {
     throw new HTTPException(404, { message: "Exam not found" });
   }
 
-  let results;
+  let results: (typeof examResults.$inferSelect)[] = [];
 
   if (userRole === "admin" || userRole === "teacher") {
     results = await db.query.examResults.findMany({
