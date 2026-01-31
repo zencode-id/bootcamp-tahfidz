@@ -1395,6 +1395,17 @@ Menerima update dari Google Sheets.
 
 **Headers:** `X-API-Key: <gas-api-key>`
 
+**Supported Tables:**
+
+- `users`
+- `classes`
+- `attendance`
+- `memorization_logs`
+- `assessments`
+- `exams`
+- `exam_results`
+- `reports`
+
 **Request Body:**
 
 ```json
@@ -1509,4 +1520,4 @@ Memaksa sinkronisasi pending items.
 
 ---
 
-_API Documentation untuk Tahfidz Bootcamp API v1.0.0_
+_API Documentation untuk Tahfidz Bootcamp API v1.1.0_
