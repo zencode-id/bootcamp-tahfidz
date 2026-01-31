@@ -1,0 +1,164 @@
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { prettyJSON } from "hono/pretty-json";
+import { HTTPException } from "hono/http-exception";
+import { ZodError } from "zod";
+import "dotenv/config";
+
+// Import routes
+import authRoutes from "./routes/auth.js";
+import syncRoutes from "./routes/sync.js";
+import tahfidzRoutes from "./routes/tahfidz.js";
+import statsRoutes from "./routes/stats.js";
+import classRoutes from "./routes/classes.js";
+import webhookRoutes from "./routes/webhook.js";
+
+// Import DB to initialize on startup
+import "./db/index.js";
+
+// Create Hono app
+const app = new Hono();
+
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+// CORS
+app.use(
+  "*",
+  cors({
+    origin: ["http://localhost:3000", "http://localhost:5173", "*"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    credentials: true,
+  }),
+);
+
+// Logger
+app.use("*", logger());
+
+// Pretty JSON in development
+if (process.env.NODE_ENV !== "production") {
+  app.use("*", prettyJSON());
+}
+
+// ============================================
+// ERROR HANDLING
+// ============================================
+app.onError((err, c) => {
+  console.error("Error:", err);
+
+  // Handle Zod validation errors
+  if (err instanceof ZodError) {
+    return c.json(
+      {
+        success: false,
+        error: "Validation Error",
+        details: err.errors.map((e) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
+      },
+      400,
+    );
+  }
+
+  // Handle HTTP exceptions
+  if (err instanceof HTTPException) {
+    return c.json(
+      {
+        success: false,
+        error: err.message,
+      },
+      err.status,
+    );
+  }
+
+  // Handle unknown errors
+  return c.json(
+    {
+      success: false,
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Internal Server Error"
+          : err.message,
+    },
+    500,
+  );
+});
+
+// ============================================
+// HEALTH CHECK
+// ============================================
+app.get("/", (c) => {
+  return c.json({
+    success: true,
+    message: "Tahfidz Bootcamp API",
+    version: "1.0.0",
+    endpoints: {
+      auth: "/auth",
+      sync: "/sync",
+      tahfidz: "/sync/tahfidz",
+      stats: "/stats",
+      classes: "/classes",
+      webhook: "/webhook",
+    },
+  });
+});
+
+app.get("/health", (c) => {
+  return c.json({
+    success: true,
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================
+// MOUNT ROUTES
+// ============================================
+app.route("/auth", authRoutes);
+app.route("/sync", syncRoutes);
+app.route("/sync/tahfidz", tahfidzRoutes);
+app.route("/stats", statsRoutes);
+app.route("/classes", classRoutes);
+app.route("/webhook", webhookRoutes);
+
+// ============================================
+// 404 HANDLER
+// ============================================
+app.notFound((c) => {
+  return c.json(
+    {
+      success: false,
+      error: "Not Found",
+      message: `Route ${c.req.method} ${c.req.path} not found`,
+    },
+    404,
+  );
+});
+
+// ============================================
+// START SERVER
+// ============================================
+const port = parseInt(process.env.PORT || "3000", 10);
+
+console.log(`
+╔═══════════════════════════════════════════════════════╗
+║                                                       ║
+║   🕋 TAHFIDZ BOOTCAMP API                             ║
+║                                                       ║
+║   Server running on http://localhost:${port}             ║
+║   Environment: ${process.env.NODE_ENV || "development"}                        ║
+║                                                       ║
+╚═══════════════════════════════════════════════════════╝
+`);
+
+serve({
+  fetch: app.fetch,
+  port,
+});
+
+export default app;

@@ -1,0 +1,909 @@
+# 🔗 API Documentation
+
+## Tahfidz Bootcamp - REST API Reference
+
+Dokumentasi lengkap untuk semua endpoint API.
+
+---
+
+## 📑 Daftar Isi
+
+1. [Authentication](#authentication)
+2. [Users](#users)
+3. [Classes](#classes)
+4. [Attendance Sync](#attendance-sync)
+5. [Tahfidz Sync](#tahfidz-sync)
+6. [Statistics](#statistics)
+7. [Webhooks](#webhooks)
+
+---
+
+## 🔐 Authentication
+
+### Headers
+
+Semua endpoint yang membutuhkan autentikasi harus menyertakan header:
+
+```
+Authorization: Bearer <token>
+```
+
+### POST /auth/register
+
+Registrasi pengguna baru.
+
+**Request Body:**
+
+```json
+{
+  "name": "Ahmad Santri",
+  "email": "ahmad@example.com",
+  "password": "password123",
+  "role": "student",
+  "parentId": "uuid-parent-optional",
+  "phone": "08123456789",
+  "address": "Jl. Contoh No. 1"
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Ahmad Santri",
+      "email": "ahmad@example.com",
+      "role": "student"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+```
+
+---
+
+### POST /auth/login
+
+Login pengguna.
+
+**Request Body:**
+
+```json
+{
+  "email": "admin@tahfidz.app",
+  "password": "admin123"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Admin",
+      "email": "admin@tahfidz.app",
+      "role": "admin"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+```
+
+---
+
+### GET /auth/me
+
+Mendapatkan profil pengguna yang sedang login.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Admin",
+    "email": "admin@tahfidz.app",
+    "role": "admin",
+    "phone": null,
+    "address": null,
+    "parentId": null,
+    "createdAt": "2026-01-31T05:00:00.000Z"
+  }
+}
+```
+
+---
+
+### PUT /auth/me
+
+Update profil pengguna yang sedang login.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+
+```json
+{
+  "name": "Admin Updated",
+  "phone": "08123456789"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Admin Updated",
+    "email": "admin@tahfidz.app",
+    "role": "admin",
+    "phone": "08123456789",
+    "address": null
+  }
+}
+```
+
+---
+
+## 👥 Users (Admin Only)
+
+### GET /auth/users
+
+Mendapatkan daftar semua pengguna.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Admin",
+      "email": "admin@tahfidz.app",
+      "role": "admin",
+      "isActive": true,
+      "createdAt": "2026-01-31T05:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### GET /auth/users/:id
+
+Mendapatkan detail pengguna berdasarkan ID.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Ahmad Santri",
+    "email": "ahmad@example.com",
+    "role": "student",
+    "parentId": "parent-uuid",
+    "phone": "08123456789",
+    "address": "Jl. Contoh No. 1",
+    "isActive": true,
+    "createdAt": "2026-01-31T05:00:00.000Z",
+    "updatedAt": "2026-01-31T05:00:00.000Z"
+  }
+}
+```
+
+---
+
+### PUT /auth/users/:id
+
+Update pengguna (full update).
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Request Body:**
+
+```json
+{
+  "name": "Ahmad Santri Updated",
+  "role": "student",
+  "isActive": true
+}
+```
+
+---
+
+### PATCH /auth/users/:id
+
+Update pengguna (partial update).
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Request Body:**
+
+```json
+{
+  "isActive": false
+}
+```
+
+---
+
+### DELETE /auth/users/:id
+
+Hapus pengguna.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "User deleted successfully"
+}
+```
+
+---
+
+## 🏫 Classes
+
+### GET /classes
+
+Mendapatkan daftar kelas.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "class-uuid",
+      "name": "Halaqah Al-Fatihah",
+      "description": "Kelas tahfidz untuk pemula",
+      "teacherId": "teacher-uuid",
+      "schedule": "{\"senin\": \"07:00\", \"rabu\": \"07:00\"}",
+      "isActive": true,
+      "teacher": {
+        "id": "teacher-uuid",
+        "name": "Ustadz Ahmad",
+        "email": "teacher@tahfidz.app"
+      },
+      "memberCount": 10
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### POST /classes
+
+Membuat kelas baru.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Request Body:**
+
+```json
+{
+  "name": "Halaqah Al-Baqarah",
+  "description": "Kelas tahfidz tingkat lanjut",
+  "teacherId": "teacher-uuid",
+  "schedule": "{\"selasa\": \"07:00\", \"kamis\": \"07:00\"}"
+}
+```
+
+---
+
+### GET /classes/:id
+
+Mendapatkan detail kelas dengan daftar anggota.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "class-uuid",
+    "name": "Halaqah Al-Fatihah",
+    "description": "Kelas tahfidz untuk pemula",
+    "teacherId": "teacher-uuid",
+    "isActive": true,
+    "teacher": {
+      "id": "teacher-uuid",
+      "name": "Ustadz Ahmad",
+      "email": "teacher@tahfidz.app"
+    },
+    "members": [
+      {
+        "id": "member-uuid",
+        "classId": "class-uuid",
+        "studentId": "student-uuid",
+        "enrolledAt": "2026-01-31T05:00:00.000Z",
+        "student": {
+          "id": "student-uuid",
+          "name": "Ahmad Santri",
+          "email": "ahmad@example.com"
+        }
+      }
+    ],
+    "memberCount": 1
+  }
+}
+```
+
+---
+
+### POST /classes/:id/members
+
+Menambahkan santri ke kelas.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "studentId": "student-uuid"
+}
+```
+
+---
+
+### DELETE /classes/:id/members/:studentId
+
+Menghapus santri dari kelas.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+---
+
+## ✅ Attendance Sync
+
+### POST /sync/attendance
+
+Bulk sync kehadiran (untuk offline sync).
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid-opsional-untuk-update",
+      "studentId": "student-uuid",
+      "classId": "class-uuid",
+      "sessionType": "subuh",
+      "status": "present",
+      "date": "2026-01-31",
+      "notes": "Hadir tepat waktu"
+    },
+    {
+      "studentId": "student-uuid-2",
+      "classId": "class-uuid",
+      "sessionType": "ziyadah",
+      "status": "sick",
+      "proofUrl": "https://example.com/bukti.jpg",
+      "date": "2026-01-31"
+    }
+  ]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Synced 2 attendance records",
+  "data": {
+    "created": 1,
+    "updated": 1,
+    "errors": []
+  }
+}
+```
+
+---
+
+### GET /sync/attendance
+
+Mendapatkan daftar kehadiran dengan filter.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+| Parameter | Tipe | Deskripsi |
+|-----------|------|-----------|
+| `page` | number | Halaman (default: 1) |
+| `limit` | number | Jumlah per halaman (default: 20, max: 100) |
+| `studentId` | uuid | Filter berdasarkan santri |
+| `classId` | uuid | Filter berdasarkan kelas |
+| `sessionType` | enum | subuh, ziyadah, murojaah, tahsin |
+| `status` | enum | present, absent, sick, leave, late |
+| `startDate` | date | Filter tanggal mulai (YYYY-MM-DD) |
+| `endDate` | date | Filter tanggal akhir (YYYY-MM-DD) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "attendance-uuid",
+      "studentId": "student-uuid",
+      "classId": "class-uuid",
+      "sessionType": "subuh",
+      "status": "present",
+      "date": "2026-01-31",
+      "notes": null,
+      "syncedAt": "2026-01-31T05:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+```
+
+---
+
+## 📖 Tahfidz Sync
+
+### POST /sync/tahfidz
+
+Bulk sync memorization logs dan assessments.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Request Body:**
+
+```json
+{
+  "logs": [
+    {
+      "id": "uuid-opsional",
+      "studentId": "student-uuid",
+      "type": "ziyadah",
+      "surahId": 1,
+      "startAyah": 1,
+      "endAyah": 7,
+      "teacherId": "teacher-uuid",
+      "sessionDate": "2026-01-31",
+      "notes": "Hafalan Al-Fatihah lengkap"
+    }
+  ],
+  "assessments": [
+    {
+      "logId": "log-uuid",
+      "tajwidScore": 85,
+      "fashohahScore": 90,
+      "fluencyScore": 88,
+      "notes": "Perlu perbaikan makhraj"
+    }
+  ]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Tahfidz data synced successfully",
+  "data": {
+    "logs": {
+      "created": 1,
+      "updated": 0,
+      "errors": []
+    },
+    "assessments": {
+      "created": 1,
+      "updated": 0,
+      "errors": []
+    }
+  }
+}
+```
+
+---
+
+### GET /sync/tahfidz/logs
+
+Mendapatkan daftar memorization logs.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+| Parameter | Tipe | Deskripsi |
+|-----------|------|-----------|
+| `page` | number | Halaman |
+| `limit` | number | Jumlah per halaman |
+| `studentId` | uuid | Filter berdasarkan santri |
+| `type` | enum | ziyadah atau murojaah |
+| `surahId` | number | Filter berdasarkan surah (1-114) |
+| `startDate` | date | Filter tanggal mulai |
+| `endDate` | date | Filter tanggal akhir |
+
+---
+
+### GET /sync/tahfidz/logs/:id
+
+Mendapatkan detail log dengan assessment.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "log-uuid",
+    "studentId": "student-uuid",
+    "type": "ziyadah",
+    "surahId": 1,
+    "startAyah": 1,
+    "endAyah": 7,
+    "sessionDate": "2026-01-31",
+    "assessment": {
+      "id": "assessment-uuid",
+      "tajwidScore": 85,
+      "fashohahScore": 90,
+      "fluencyScore": 88,
+      "totalScore": 87.67,
+      "grade": "B"
+    }
+  }
+}
+```
+
+---
+
+### GET /sync/tahfidz/surahs
+
+Mendapatkan daftar 114 surah.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Al-Fatihah",
+      "arabicName": "الفاتحة",
+      "totalAyahs": 7,
+      "juz": "[\"1\"]"
+    },
+    {
+      "id": 2,
+      "name": "Al-Baqarah",
+      "arabicName": "البقرة",
+      "totalAyahs": 286,
+      "juz": "[\"1\",\"2\",\"3\"]"
+    }
+  ]
+}
+```
+
+---
+
+## 📊 Statistics
+
+### GET /stats/progress/:studentId
+
+Mendapatkan progress hafalan santri.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "student": {
+      "id": "student-uuid",
+      "name": "Ahmad Santri"
+    },
+    "overall": {
+      "totalAyahsMemorized": 150,
+      "totalQuranAyahs": 6236,
+      "progressPercentage": 2.4,
+      "juzCompleted": 0
+    },
+    "scores": {
+      "averageTajwid": 85.5,
+      "averageFashohah": 88.2,
+      "averageFluency": 82.1,
+      "averageTotal": 85.27,
+      "totalAssessments": 10
+    },
+    "juzProgress": [
+      {
+        "juz": 1,
+        "percentage": 50.5,
+        "ayahsMemorized": 75,
+        "totalAyahs": 148
+      }
+    ],
+    "surahProgress": [
+      {
+        "surahId": 1,
+        "totalAyahs": 7,
+        "sessions": 1
+      }
+    ],
+    "recentActivity": []
+  }
+}
+```
+
+---
+
+### GET /stats/attendance/:studentId
+
+Mendapatkan statistik kehadiran untuk heatmap.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+| Parameter | Tipe | Deskripsi |
+|-----------|------|-----------|
+| `year` | number | Tahun (default: tahun ini) |
+| `month` | number | Bulan (1-12, opsional) |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "student": {
+      "id": "student-uuid",
+      "name": "Ahmad Santri"
+    },
+    "period": {
+      "year": 2026,
+      "month": 1,
+      "startDate": "2026-01-01",
+      "endDate": "2026-01-31"
+    },
+    "overall": {
+      "totalSessions": 50,
+      "presentCount": 45,
+      "absentCount": 2,
+      "sickCount": 2,
+      "leaveCount": 1,
+      "lateCount": 0,
+      "attendanceRate": 90.0
+    },
+    "heatmap": [
+      {
+        "date": "2026-01-01",
+        "sessions": [
+          { "type": "subuh", "status": "present" },
+          { "type": "ziyadah", "status": "present" }
+        ],
+        "presentCount": 2,
+        "absentCount": 0,
+        "totalSessions": 2
+      }
+    ],
+    "monthlySummary": {
+      "2026-01": {
+        "present": 45,
+        "absent": 2,
+        "sick": 2,
+        "leave": 1,
+        "late": 0,
+        "total": 50,
+        "attendanceRate": 90.0
+      }
+    },
+    "sessionTypeBreakdown": [
+      { "sessionType": "subuh", "status": "present", "count": 25 }
+    ]
+  }
+}
+```
+
+---
+
+### GET /stats/leaderboard
+
+Mendapatkan leaderboard santri.
+
+**Headers:** `Authorization: Bearer <token>` (Teacher/Admin)
+
+**Query Parameters:**
+| Parameter | Tipe | Deskripsi |
+|-----------|------|-----------|
+| `limit` | number | Jumlah teratas (default: 10, max: 50) |
+| `type` | enum | ayahs, score, attendance |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "type": "ayahs",
+    "leaderboard": [
+      {
+        "studentId": "student-uuid",
+        "studentName": "Ahmad Santri",
+        "value": 500
+      },
+      {
+        "studentId": "student-uuid-2",
+        "studentName": "Budi Santri",
+        "value": 450
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 🔄 Webhooks
+
+### POST /webhook/gas
+
+Menerima update dari Google Sheets.
+
+**Headers:** `X-API-Key: <gas-api-key>`
+
+**Request Body:**
+
+```json
+{
+  "action": "update",
+  "table": "attendance",
+  "data": {
+    "id": "attendance-uuid",
+    "studentId": "student-uuid",
+    "status": "present"
+  }
+}
+```
+
+---
+
+### GET /webhook/sync/status
+
+Mendapatkan status sinkronisasi.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "pending": 5,
+    "synced": 100,
+    "failed": 2,
+    "lastSync": "2026-01-31T05:00:00.000Z"
+  }
+}
+```
+
+---
+
+### POST /webhook/sync/force
+
+Memaksa sinkronisasi pending items.
+
+**Headers:** `Authorization: Bearer <token>` (Admin only)
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Synced 5 items",
+  "data": {
+    "success": true,
+    "syncedCount": 5
+  }
+}
+```
+
+---
+
+## ❌ Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "success": false,
+  "error": "Validation Error",
+  "details": [
+    {
+      "field": "email",
+      "message": "Invalid email format"
+    }
+  ]
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "success": false,
+  "error": "Missing or invalid authorization header"
+}
+```
+
+### 403 Forbidden
+
+```json
+{
+  "success": false,
+  "error": "Access denied. Required roles: admin"
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "success": false,
+  "error": "User not found"
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "success": false,
+  "error": "Internal Server Error"
+}
+```
+
+---
+
+_API Documentation untuk Tahfidz Bootcamp API v1.0.0_
