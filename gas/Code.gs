@@ -423,7 +423,24 @@ function onEdit(e) {
 
   const data = {};
   headers.forEach((h, i) => {
-    data[h] = rowData[i];
+    let value = rowData[i];
+
+    // Normalize boolean fields (isActive)
+    if (h === "isActive") {
+      if (
+        value === true ||
+        value === "TRUE" ||
+        value === 1 ||
+        value === "ON" ||
+        value === "Active"
+      ) {
+        value = true;
+      } else {
+        value = false;
+      }
+    }
+
+    data[h] = value;
   });
 
   // Determine table name
@@ -595,7 +612,24 @@ function manualSyncToAPI() {
     for (let i = 1; i < values.length; i++) {
       const data = {};
       headers.forEach((h, j) => {
-        data[h] = values[i][j];
+        let value = values[i][j];
+
+        // Normalize boolean fields (isActive)
+        if (h === "isActive") {
+          if (
+            value === true ||
+            value === "TRUE" ||
+            value === 1 ||
+            value === "ON" ||
+            value === "Active"
+          ) {
+            value = true;
+          } else {
+            value = false;
+          }
+        }
+
+        data[h] = value;
       });
 
       if (data.id) {

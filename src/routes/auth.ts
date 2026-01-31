@@ -211,7 +211,8 @@ auth.get("/users", authMiddleware, adminOnly, async (c) => {
   }
 
   if (isActive !== undefined) {
-    conditions.push(eq(users.isActive, isActive === "true"));
+    const isTrue = isActive === "true" || isActive === "1" || isActive === "on";
+    conditions.push(eq(users.isActive, isTrue));
   }
 
   if (search) {
