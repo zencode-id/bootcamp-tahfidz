@@ -27,6 +27,8 @@ const CONFIG = {
 
 // Sheet names
 const SHEETS = {
+  USERS: "Users",
+  CLASSES: "Classes",
   ATTENDANCE: "Attendance",
   MEMORIZATION_LOGS: "MemorizationLogs",
   ASSESSMENTS: "Assessments",
@@ -38,6 +40,29 @@ const SHEETS = {
 
 // Column headers for each sheet
 const HEADERS = {
+  USERS: [
+    "id",
+    "name",
+    "email",
+    "role",
+    "parentId",
+    "phone",
+    "address",
+    "isActive",
+    "createdAt",
+    "updatedAt",
+  ],
+  CLASSES: [
+    "id",
+    "name",
+    "description",
+    "teacherId",
+    "teacherName",
+    "schedule",
+    "isActive",
+    "createdAt",
+    "updatedAt",
+  ],
   ATTENDANCE: [
     "id",
     "studentId",
@@ -234,6 +259,14 @@ function processItem(item) {
   let headers;
 
   switch (table) {
+    case "users":
+      sheetName = SHEETS.USERS;
+      headers = HEADERS.USERS;
+      break;
+    case "classes":
+      sheetName = SHEETS.CLASSES;
+      headers = HEADERS.CLASSES;
+      break;
     case "attendance":
       sheetName = SHEETS.ATTENDANCE;
       headers = HEADERS.ATTENDANCE;
@@ -363,6 +396,8 @@ function onEdit(e) {
 
   // Only sync specific sheets
   const syncableSheets = [
+    SHEETS.USERS,
+    SHEETS.CLASSES,
     SHEETS.ATTENDANCE,
     SHEETS.MEMORIZATION_LOGS,
     SHEETS.ASSESSMENTS,
@@ -394,6 +429,12 @@ function onEdit(e) {
   // Determine table name
   let tableName;
   switch (sheetName) {
+    case SHEETS.USERS:
+      tableName = "users";
+      break;
+    case SHEETS.CLASSES:
+      tableName = "classes";
+      break;
     case SHEETS.ATTENDANCE:
       tableName = "attendance";
       break;
@@ -502,6 +543,16 @@ function createResponse(status, data) {
 function manualSyncToAPI() {
   const sheets = [
     {
+      name: SHEETS.USERS,
+      table: "users",
+      headers: HEADERS.USERS,
+    },
+    {
+      name: SHEETS.CLASSES,
+      table: "classes",
+      headers: HEADERS.CLASSES,
+    },
+    {
       name: SHEETS.ATTENDANCE,
       table: "attendance",
       headers: HEADERS.ATTENDANCE,
@@ -569,6 +620,16 @@ function setupSheets() {
 
   // Define all sheets with their headers
   const sheetsConfig = [
+    {
+      name: SHEETS.USERS,
+      headers: HEADERS.USERS,
+      description: "Data pengguna (Teacher, Student, Parent, Admin)",
+    },
+    {
+      name: SHEETS.CLASSES,
+      headers: HEADERS.CLASSES,
+      description: "Data kelas/halaqah",
+    },
     {
       name: SHEETS.ATTENDANCE,
       headers: HEADERS.ATTENDANCE,
@@ -655,10 +716,15 @@ function setupSheets() {
       ["🕋 TAHFIDZ BOOTCAMP - GOOGLE SHEETS SYNC"],
       [""],
       ["📋 SHEETS YANG TERSEDIA:"],
-      ["1. Attendance - Catatan kehadiran santri"],
-      ["2. MemorizationLogs - Catatan hafalan (ziyadah/murojaah)"],
-      ["3. Assessments - Penilaian hafalan"],
-      ["4. SyncLog - Log aktivitas sinkronisasi"],
+      ["1. Users - Data pengguna (Teacher, Student, Parent, Admin)"],
+      ["2. Classes - Data kelas/halaqah"],
+      ["3. Attendance - Catatan kehadiran santri"],
+      ["4. MemorizationLogs - Catatan hafalan (ziyadah/murojaah)"],
+      ["5. Assessments - Penilaian hafalan"],
+      ["6. Exams - Data ujian"],
+      ["7. ExamResults - Hasil ujian"],
+      ["8. Reports - Raport semester"],
+      ["9. SyncLog - Log aktivitas sinkronisasi"],
       [""],
       ["⚙️ KONFIGURASI:"],
       ["1. Buka Extensions > Apps Script"],
