@@ -1,0 +1,554 @@
+{
+  "info": {
+    "name": "Tahfidz Bootcamp API",
+    "description": "API Collection untuk School Attendance & Tahfidz Bootcamp Application",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.data.token);",
+                  "    console.log('Token saved!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@tahfidz.app\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ahmad Santri\",\n  \"email\": \"ahmad@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"student\",\n  \"phone\": \"08123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "List All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏫 Classes",
+      "item": [
+        {
+          "name": "List Classes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["classes"]
+            }
+          }
+        },
+        {
+          "name": "Create Class",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Halaqah Al-Fatihah\",\n  \"description\": \"Kelas tahfidz untuk pemula\",\n  \"schedule\": \"{\\\"senin\\\": \\\"07:00\\\", \\\"rabu\\\": \\\"07:00\\\"}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/classes",
+              "host": ["{{baseUrl}}"],
+              "path": ["classes"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✅ Attendance",
+      "item": [
+        {
+          "name": "Bulk Sync Attendance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"studentId\": \"{{studentId}}\",\n      \"sessionType\": \"subuh\",\n      \"status\": \"present\",\n      \"date\": \"2026-01-31\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sync/attendance",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "attendance"]
+            }
+          }
+        },
+        {
+          "name": "Get Attendance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sync/attendance?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "attendance"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📖 Tahfidz",
+      "item": [
+        {
+          "name": "Get Surahs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sync/tahfidz/surahs",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "tahfidz", "surahs"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Sync Tahfidz",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logs\": [\n    {\n      \"studentId\": \"{{studentId}}\",\n      \"type\": \"ziyadah\",\n      \"surahId\": 1,\n      \"startAyah\": 1,\n      \"endAyah\": 7,\n      \"sessionDate\": \"2026-01-31\",\n      \"notes\": \"Hafalan Al-Fatihah lengkap\"\n    }\n  ],\n  \"assessments\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sync/tahfidz",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "tahfidz"]
+            }
+          }
+        },
+        {
+          "name": "Get Memorization Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sync/tahfidz/logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["sync", "tahfidz", "logs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📝 Exams",
+      "item": [
+        {
+          "name": "List Exams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exams",
+              "host": ["{{baseUrl}}"],
+              "path": ["exams"]
+            }
+          }
+        },
+        {
+          "name": "Create Exam",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ujian Tengah Semester 1\",\n  \"description\": \"Ujian hafalan semester 1\",\n  \"examType\": \"mid_semester\",\n  \"startSurah\": 1,\n  \"endSurah\": 3,\n  \"examDate\": \"2026-02-15\",\n  \"academicYear\": \"2025/2026\",\n  \"semester\": \"1\",\n  \"passingScore\": 70\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exams",
+              "host": ["{{baseUrl}}"],
+              "path": ["exams"]
+            }
+          }
+        },
+        {
+          "name": "Add Exam Result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"hafalanScore\": 85,\n  \"tajwidScore\": 80,\n  \"fashohahScore\": 82,\n  \"fluencyScore\": 78,\n  \"feedback\": \"Perlu perbaikan makhraj huruf\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exams/{{examId}}/results",
+              "host": ["{{baseUrl}}"],
+              "path": ["exams", "{{examId}}", "results"]
+            }
+          }
+        },
+        {
+          "name": "Get Exam Results",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exams/{{examId}}/results",
+              "host": ["{{baseUrl}}"],
+              "path": ["exams", "{{examId}}", "results"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Reports",
+      "item": [
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports"]
+            }
+          }
+        },
+        {
+          "name": "Generate Reports (Auto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYear\": \"2025/2026\",\n  \"semester\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reports/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "generate"]
+            }
+          }
+        },
+        {
+          "name": "Get Report Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/{{reportId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "{{reportId}}"]
+            }
+          }
+        },
+        {
+          "name": "Publish Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/{{reportId}}/publish",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "{{reportId}}", "publish"]
+            }
+          }
+        },
+        {
+          "name": "Get Report for Print",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/{{reportId}}/print",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "{{reportId}}", "print"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📈 Stats",
+      "item": [
+        {
+          "name": "Get Student Progress",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/progress/{{studentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "progress", "{{studentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Attendance Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/attendance/{{studentId}}?year=2026",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "attendance", "{{studentId}}"],
+              "query": [{ "key": "year", "value": "2026" }]
+            }
+          }
+        },
+        {
+          "name": "Get Leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stats/leaderboard?type=ayahs&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "leaderboard"],
+              "query": [
+                { "key": "type", "value": "ayahs" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "API Info",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
