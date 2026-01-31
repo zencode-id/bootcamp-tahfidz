@@ -784,6 +784,38 @@ async function seed() {
       "✅ Sample teacher created: teacher@tahfidz.app / teacher123\n",
     );
 
+    // Create sample students (Bulk)
+    console.log("🎓 Creating 50 sample students...");
+    const studentPassword = await bcrypt.hash("student123", 12);
+    const students = [];
+
+    for (let i = 1; i <= 50; i++) {
+      students.push({
+        name: `Santri ${i}`,
+        email: `student${i}@tahfidz.app`,
+        password: studentPassword,
+        role: "student" as const,
+        isActive: i % 10 !== 0, // 10% students are inactive
+        createdAt: new Date(
+          Date.now() - Math.floor(Math.random() * 10000000000),
+        ).toISOString(),
+      });
+    }
+
+    // Insert individually to handle conflicts easily or batch if supported
+    // Using simple loop for SQLite compatibility safety
+    let createdCount = 0;
+    for (const student of students) {
+      try {
+        await db.insert(users).values(student).onConflictDoNothing();
+        createdCount++;
+      } catch (e) {
+        // Ignore duplicates
+      }
+    }
+
+    console.log(`✅ ${createdCount} Sample students created/verified\n`);
+
     console.log("🎉 Database seed completed successfully!");
   } catch (error) {
     console.error("❌ Seed failed:", error);

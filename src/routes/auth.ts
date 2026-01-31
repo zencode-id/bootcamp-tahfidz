@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, users } from "../db/index.js";
 import {
   loginSchema,
@@ -192,18 +192,65 @@ auth.put(
 // ============================================
 
 // GET /auth/users - Get all users (admin only)
+// GET /auth/users - Get all users with pagination and filtering (admin only)
 auth.get("/users", authMiddleware, adminOnly, async (c) => {
+  const query = c.req.query();
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 20;
+  const offset = (page - 1) * limit;
+
+  const role = query.role;
+  const isActive = query.is_active;
+  const search = query.q;
+
+  // Build conditions
+  const conditions = [];
+
+  if (role) {
+    conditions.push(eq(users.role, role as any));
+  }
+
+  if (isActive !== undefined) {
+    conditions.push(eq(users.isActive, isActive === "true"));
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    conditions.push(
+      sql`(lower(${users.name}) LIKE ${`%${searchLower}%`} OR lower(${users.email}) LIKE ${`%${searchLower}%`})`,
+    );
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Get data
   const allUsers = await db.query.users.findMany({
+    where: whereClause,
     columns: {
       password: false, // Exclude password
     },
+    limit: limit,
+    offset: offset,
     orderBy: (users, { desc }) => [desc(users.createdAt)],
   });
+
+  // Get total count
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(users)
+    .where(whereClause);
+
+  const total = totalResult[0]?.count || 0;
 
   return c.json({
     success: true,
     data: allUsers,
-    total: allUsers.length,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
   });
 });
 

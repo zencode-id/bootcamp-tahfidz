@@ -169,6 +169,15 @@ Mendapatkan daftar semua pengguna.
 
 **Headers:** `Authorization: Bearer <token>` (Admin only)
 
+**Query Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `page` | number | ❌ | Halaman (default: 1) |
+| `limit` | number | ❌ | Jumlah data per halaman (default: 20) |
+| `role` | string | ❌ | Filter by role (admin, teacher, student, parent) |
+| `is_active` | boolean | ❌ | Filter by status (true/false) |
+| `q` | string | ❌ | Search by name or email |
+
 **Response (200):**
 
 ```json
@@ -184,7 +193,12 @@ Mendapatkan daftar semua pengguna.
       "createdAt": "2026-01-31T05:00:00.000Z"
     }
   ],
-  "total": 1
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 50,
+    "totalPages": 3
+  }
 }
 ```
 
