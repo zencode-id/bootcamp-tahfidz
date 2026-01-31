@@ -30,6 +30,9 @@ const SHEETS = {
   ATTENDANCE: "Attendance",
   MEMORIZATION_LOGS: "MemorizationLogs",
   ASSESSMENTS: "Assessments",
+  EXAMS: "Exams",
+  EXAM_RESULTS: "ExamResults",
+  REPORTS: "Reports",
   SYNC_LOG: "SyncLog",
 };
 
@@ -74,6 +77,88 @@ const HEADERS = {
     "grade",
     "notes",
     "assessedBy",
+    "createdAt",
+    "updatedAt",
+  ],
+  EXAMS: [
+    "id",
+    "name",
+    "description",
+    "examType",
+    "classId",
+    "surahId",
+    "startSurah",
+    "endSurah",
+    "startAyah",
+    "endAyah",
+    "examDate",
+    "academicYear",
+    "semester",
+    "passingScore",
+    "maxScore",
+    "createdBy",
+    "isActive",
+    "createdAt",
+    "updatedAt",
+  ],
+  EXAM_RESULTS: [
+    "id",
+    "examId",
+    "studentId",
+    "hafalanScore",
+    "tajwidScore",
+    "fashohahScore",
+    "fluencyScore",
+    "makhorijulHurufScore",
+    "tartilScore",
+    "totalScore",
+    "grade",
+    "isPassed",
+    "rank",
+    "examinerId",
+    "notes",
+    "feedback",
+    "examTakenAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  REPORTS: [
+    "id",
+    "studentId",
+    "classId",
+    "teacherId",
+    "academicYear",
+    "semester",
+    "totalSessions",
+    "presentCount",
+    "absentCount",
+    "sickCount",
+    "leaveCount",
+    "lateCount",
+    "attendancePercentage",
+    "totalAyahsMemorized",
+    "totalNewAyahs",
+    "totalMurojaahSessions",
+    "currentSurah",
+    "currentAyah",
+    "progressPercentage",
+    "avgTajwidScore",
+    "avgFashohahScore",
+    "avgFluencyScore",
+    "avgTotalScore",
+    "midSemesterScore",
+    "endSemesterScore",
+    "finalScore",
+    "finalGrade",
+    "classRank",
+    "totalStudents",
+    "status",
+    "teacherNotes",
+    "recommendations",
+    "targetAyahs",
+    "approvedBy",
+    "approvedAt",
+    "publishedAt",
     "createdAt",
     "updatedAt",
   ],
@@ -161,6 +246,18 @@ function processItem(item) {
       sheetName = SHEETS.ASSESSMENTS;
       headers = HEADERS.ASSESSMENTS;
       break;
+    case "exams":
+      sheetName = SHEETS.EXAMS;
+      headers = HEADERS.EXAMS;
+      break;
+    case "exam_results":
+      sheetName = SHEETS.EXAM_RESULTS;
+      headers = HEADERS.EXAM_RESULTS;
+      break;
+    case "reports":
+      sheetName = SHEETS.REPORTS;
+      headers = HEADERS.REPORTS;
+      break;
     default:
       throw new Error(`Unknown table: ${table}`);
   }
@@ -184,8 +281,17 @@ function processItem(item) {
 
 /**
  * Get or create a sheet with headers
+ * NOTE: This is a helper function - do not run directly!
+ * Use setupSheets() instead.
  */
 function getOrCreateSheet(name, headers) {
+  // Safety check - this function requires parameters
+  if (!name || !headers) {
+    throw new Error(
+      "This is a helper function. Please run setupSheets() instead.",
+    );
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(name);
 
@@ -256,11 +362,16 @@ function onEdit(e) {
   const sheetName = sheet.getName();
 
   // Only sync specific sheets
-  if (
-    ![SHEETS.ATTENDANCE, SHEETS.MEMORIZATION_LOGS, SHEETS.ASSESSMENTS].includes(
-      sheetName,
-    )
-  ) {
+  const syncableSheets = [
+    SHEETS.ATTENDANCE,
+    SHEETS.MEMORIZATION_LOGS,
+    SHEETS.ASSESSMENTS,
+    SHEETS.EXAMS,
+    SHEETS.EXAM_RESULTS,
+    SHEETS.REPORTS,
+  ];
+
+  if (!syncableSheets.includes(sheetName)) {
     return;
   }
 
@@ -291,6 +402,15 @@ function onEdit(e) {
       break;
     case SHEETS.ASSESSMENTS:
       tableName = "assessments";
+      break;
+    case SHEETS.EXAMS:
+      tableName = "exams";
+      break;
+    case SHEETS.EXAM_RESULTS:
+      tableName = "exam_results";
+      break;
+    case SHEETS.REPORTS:
+      tableName = "reports";
       break;
   }
 
@@ -396,6 +516,21 @@ function manualSyncToAPI() {
       table: "assessments",
       headers: HEADERS.ASSESSMENTS,
     },
+    {
+      name: SHEETS.EXAMS,
+      table: "exams",
+      headers: HEADERS.EXAMS,
+    },
+    {
+      name: SHEETS.EXAM_RESULTS,
+      table: "exam_results",
+      headers: HEADERS.EXAM_RESULTS,
+    },
+    {
+      name: SHEETS.REPORTS,
+      table: "reports",
+      headers: HEADERS.REPORTS,
+    },
   ];
 
   for (const { name, table, headers } of sheets) {
@@ -447,7 +582,22 @@ function setupSheets() {
     {
       name: SHEETS.ASSESSMENTS,
       headers: HEADERS.ASSESSMENTS,
-      description: "Penilaian hafalan",
+      description: "Penilaian hafalan harian",
+    },
+    {
+      name: SHEETS.EXAMS,
+      headers: HEADERS.EXAMS,
+      description: "Data ujian tahfidz",
+    },
+    {
+      name: SHEETS.EXAM_RESULTS,
+      headers: HEADERS.EXAM_RESULTS,
+      description: "Hasil ujian per santri",
+    },
+    {
+      name: SHEETS.REPORTS,
+      headers: HEADERS.REPORTS,
+      description: "Raport semester santri",
     },
     {
       name: SHEETS.SYNC_LOG,
