@@ -1,215 +1,243 @@
-# Tahfidz Bootcamp API 🕋
+# 🕋 Tahfidz Bootcamp API
 
-Backend API for School Attendance & Tahfidz (Quran Memorization) Bootcamp Application.
+> Backend API untuk Aplikasi Kehadiran Sekolah & Tahfidz (Hafalan Al-Quran)
 
-## Tech Stack
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Hono](https://img.shields.io/badge/Hono.js-4.0-E36002?style=flat&logo=hono&logoColor=white)](https://hono.dev/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat&logo=sqlite&logoColor=white)](https://sqlite.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat&logo=typescript&logoColor=white)](https://typescriptlang.org/)
 
-- **Runtime/Framework**: Hono.js (Node.js)
-- **Database**: SQLite with Drizzle ORM
-- **Validation**: Zod
-- **Authentication**: JWT with RBAC
-- **Sync**: Google Sheets integration via Google Apps Script
+---
 
-## Features
+## ✨ Features
 
-- 🔐 JWT Authentication with Role-Based Access Control (RBAC)
-- 👥 User management (Admin, Teacher, Student, Parent)
-- 📚 Class/Halaqah management
-- ✅ Attendance tracking with offline sync support
-- 📖 Quran memorization (Tahfidz) logging
-- 📊 Assessment scoring (Tajwid, Fashohah, Fluency)
-- 📈 Progress statistics and leaderboards
-- 🔄 Google Sheets bidirectional sync
+| Feature                | Description                                 |
+| ---------------------- | ------------------------------------------- |
+| 🔐 **Authentication**  | JWT dengan Role-Based Access Control (RBAC) |
+| 👥 **User Management** | Admin, Teacher, Student, Parent roles       |
+| 📚 **Class/Halaqah**   | Manajemen kelas tahfidz                     |
+| ✅ **Attendance**      | Tracking kehadiran dengan offline sync      |
+| 📖 **Tahfidz Logs**    | Pencatatan hafalan (Ziyadah/Murojaah)       |
+| 📊 **Assessment**      | Penilaian Tajwid, Fashohah, Kelancaran      |
+| 📈 **Statistics**      | Progress, heatmap, leaderboard              |
+| 🔄 **Google Sheets**   | Sinkronisasi bidirectional                  |
 
-## Quick Start
+---
+
+## 🛠️ Tech Stack
+
+- **Runtime**: Node.js 18+
+- **Framework**: [Hono.js](https://hono.dev/) - Ultrafast web framework
+- **Database**: SQLite with [Drizzle ORM](https://orm.drizzle.team/)
+- **Validation**: [Zod](https://zod.dev/)
+- **Auth**: JWT + bcrypt
+- **Sync**: Google Apps Script integration
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18 or higher
 - npm or yarn
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd tahfidz-bootcamp-api
+# Clone repository
+git clone https://github.com/zencode-id/bootcamp-tahfidz.git
+cd bootcamp-tahfidz
 
 # Install dependencies
 npm install
 
-# Copy environment variables
+# Setup environment
 cp .env.example .env
+# Edit .env dan ubah JWT_SECRET!
 
-# Edit .env with your settings
-# Important: Change JWT_SECRET!
-
-# Push database schema
+# Setup database
 npm run db:push
-
-# Seed the database
 npm run db:seed
 
-# Start development server
+# Start server
 npm run dev
 ```
 
-### Available Scripts
+Server akan berjalan di **http://localhost:3000**
 
-| Script                | Description                              |
-| --------------------- | ---------------------------------------- |
-| `npm run dev`         | Start development server with hot reload |
-| `npm run build`       | Build for production                     |
-| `npm run start`       | Start production server                  |
-| `npm run db:push`     | Push schema changes to database          |
-| `npm run db:generate` | Generate migration files                 |
-| `npm run db:seed`     | Seed database with initial data          |
-| `npm run db:studio`   | Open Drizzle Studio                      |
+---
 
-## API Endpoints
+## 📜 Available Scripts
 
-### Authentication
+| Script                | Description                           |
+| --------------------- | ------------------------------------- |
+| `npm run dev`         | Start development server (hot reload) |
+| `npm run build`       | Build untuk production                |
+| `npm run start`       | Start production server               |
+| `npm run db:push`     | Push schema ke database               |
+| `npm run db:generate` | Generate migration files              |
+| `npm run db:seed`     | Seed data awal                        |
+| `npm run db:studio`   | Buka Drizzle Studio                   |
 
-| Method | Endpoint          | Description                 | Auth  |
-| ------ | ----------------- | --------------------------- | ----- |
-| POST   | `/auth/register`  | Register new user           | -     |
-| POST   | `/auth/login`     | Login                       | -     |
-| GET    | `/auth/me`        | Get current user profile    | ✅    |
-| PUT    | `/auth/me`        | Update current user profile | ✅    |
-| GET    | `/auth/users`     | List all users              | Admin |
-| GET    | `/auth/users/:id` | Get user by ID              | Admin |
-| PUT    | `/auth/users/:id` | Update user                 | Admin |
-| PATCH  | `/auth/users/:id` | Partial update user         | Admin |
-| DELETE | `/auth/users/:id` | Delete user                 | Admin |
+---
 
-### Classes
+## 📡 API Endpoints
 
-| Method | Endpoint                          | Description          | Auth          |
-| ------ | --------------------------------- | -------------------- | ------------- |
-| GET    | `/classes`                        | List classes         | ✅            |
-| POST   | `/classes`                        | Create class         | Admin         |
-| GET    | `/classes/:id`                    | Get class details    | ✅            |
-| PUT    | `/classes/:id`                    | Update class         | Admin         |
-| PATCH  | `/classes/:id`                    | Partial update class | Admin         |
-| DELETE | `/classes/:id`                    | Delete class         | Admin         |
-| POST   | `/classes/:id/members`            | Add student to class | Teacher/Admin |
-| DELETE | `/classes/:id/members/:studentId` | Remove student       | Teacher/Admin |
+### 🔐 Authentication
 
-### Attendance Sync
+| Method   | Endpoint          | Description        | Auth  |
+| -------- | ----------------- | ------------------ | ----- |
+| `POST`   | `/auth/register`  | Register user baru | -     |
+| `POST`   | `/auth/login`     | Login              | -     |
+| `GET`    | `/auth/me`        | Get profile        | ✅    |
+| `PUT`    | `/auth/me`        | Update profile     | ✅    |
+| `GET`    | `/auth/users`     | List semua users   | Admin |
+| `PUT`    | `/auth/users/:id` | Update user        | Admin |
+| `DELETE` | `/auth/users/:id` | Hapus user         | Admin |
 
-| Method | Endpoint               | Description            | Auth          |
-| ------ | ---------------------- | ---------------------- | ------------- |
-| POST   | `/sync/attendance`     | Bulk sync attendance   | Teacher/Admin |
-| GET    | `/sync/attendance`     | Get attendance records | ✅            |
-| GET    | `/sync/attendance/:id` | Get single attendance  | ✅            |
-| PUT    | `/sync/attendance/:id` | Update attendance      | Teacher/Admin |
-| PATCH  | `/sync/attendance/:id` | Partial update         | Teacher/Admin |
-| DELETE | `/sync/attendance/:id` | Delete attendance      | Teacher/Admin |
+### 🏫 Classes
 
-### Tahfidz Sync
+| Method   | Endpoint                          | Description   | Auth          |
+| -------- | --------------------------------- | ------------- | ------------- |
+| `GET`    | `/classes`                        | List kelas    | ✅            |
+| `POST`   | `/classes`                        | Buat kelas    | Admin         |
+| `GET`    | `/classes/:id`                    | Detail kelas  | ✅            |
+| `PUT`    | `/classes/:id`                    | Update kelas  | Admin         |
+| `DELETE` | `/classes/:id`                    | Hapus kelas   | Admin         |
+| `POST`   | `/classes/:id/members`            | Tambah santri | Teacher/Admin |
+| `DELETE` | `/classes/:id/members/:studentId` | Hapus santri  | Teacher/Admin |
 
-| Method | Endpoint                        | Description                    | Auth          |
-| ------ | ------------------------------- | ------------------------------ | ------------- |
-| POST   | `/sync/tahfidz`                 | Bulk sync logs & assessments   | Teacher/Admin |
-| GET    | `/sync/tahfidz/logs`            | Get memorization logs          | ✅            |
-| GET    | `/sync/tahfidz/logs/:id`        | Get single log with assessment | ✅            |
-| PUT    | `/sync/tahfidz/logs/:id`        | Update log                     | Teacher/Admin |
-| PATCH  | `/sync/tahfidz/logs/:id`        | Partial update log             | Teacher/Admin |
-| DELETE | `/sync/tahfidz/logs/:id`        | Delete log                     | Teacher/Admin |
-| POST   | `/sync/tahfidz/assessments`     | Create assessment              | Teacher/Admin |
-| PUT    | `/sync/tahfidz/assessments/:id` | Update assessment              | Teacher/Admin |
-| PATCH  | `/sync/tahfidz/assessments/:id` | Partial update                 | Teacher/Admin |
-| DELETE | `/sync/tahfidz/assessments/:id` | Delete assessment              | Teacher/Admin |
-| GET    | `/sync/tahfidz/surahs`          | Get all surahs                 | ✅            |
+### ✅ Attendance Sync
 
-### Statistics
+| Method   | Endpoint               | Description         | Auth          |
+| -------- | ---------------------- | ------------------- | ------------- |
+| `POST`   | `/sync/attendance`     | Bulk sync kehadiran | Teacher/Admin |
+| `GET`    | `/sync/attendance`     | Get data kehadiran  | ✅            |
+| `GET`    | `/sync/attendance/:id` | Get single record   | ✅            |
+| `PUT`    | `/sync/attendance/:id` | Update kehadiran    | Teacher/Admin |
+| `DELETE` | `/sync/attendance/:id` | Hapus kehadiran     | Teacher/Admin |
 
-| Method | Endpoint                       | Description            | Auth          |
-| ------ | ------------------------------ | ---------------------- | ------------- |
-| GET    | `/stats/progress/:studentId`   | Get tahfidz progress   | ✅\*          |
-| GET    | `/stats/attendance/:studentId` | Get attendance heatmap | ✅\*          |
-| GET    | `/stats/class/:classId`        | Get class statistics   | Teacher/Admin |
-| GET    | `/stats/leaderboard`           | Get leaderboard        | Teacher/Admin |
+### 📖 Tahfidz Sync
 
-\*Students can only access their own data, Parents can access their children's data
+| Method | Endpoint                    | Description         | Auth          |
+| ------ | --------------------------- | ------------------- | ------------- |
+| `POST` | `/sync/tahfidz`             | Bulk sync hafalan   | Teacher/Admin |
+| `GET`  | `/sync/tahfidz/logs`        | Get catatan hafalan | ✅            |
+| `GET`  | `/sync/tahfidz/logs/:id`    | Detail + assessment | ✅            |
+| `POST` | `/sync/tahfidz/assessments` | Buat penilaian      | Teacher/Admin |
+| `GET`  | `/sync/tahfidz/surahs`      | List 114 surah      | ✅            |
 
-### Webhooks
+### 📊 Statistics
 
-| Method | Endpoint               | Description            | Auth    |
-| ------ | ---------------------- | ---------------------- | ------- |
-| POST   | `/webhook/gas`         | Receive GSheet updates | API Key |
-| POST   | `/webhook/gas/bulk`    | Receive bulk updates   | API Key |
-| GET    | `/webhook/sync/status` | Get sync status        | Admin   |
-| POST   | `/webhook/sync/force`  | Force sync pending     | Admin   |
+| Method | Endpoint                       | Description       | Auth          |
+| ------ | ------------------------------ | ----------------- | ------------- |
+| `GET`  | `/stats/progress/:studentId`   | Progress hafalan  | ✅\*          |
+| `GET`  | `/stats/attendance/:studentId` | Heatmap kehadiran | ✅\*          |
+| `GET`  | `/stats/class/:classId`        | Statistik kelas   | Teacher/Admin |
+| `GET`  | `/stats/leaderboard`           | Leaderboard       | Teacher/Admin |
 
-## Database Schema
+> \*Santri hanya bisa akses data sendiri, Wali bisa akses data anaknya
 
-### Users
+### 🔄 Webhooks
 
-- id (UUID), name, email, password, role, parentId, phone, address, isActive, createdAt, updatedAt
+| Method | Endpoint               | Description               | Auth    |
+| ------ | ---------------------- | ------------------------- | ------- |
+| `POST` | `/webhook/gas`         | Terima update dari GSheet | API Key |
+| `POST` | `/webhook/gas/bulk`    | Bulk update dari GSheet   | API Key |
+| `GET`  | `/webhook/sync/status` | Cek status sync           | Admin   |
+| `POST` | `/webhook/sync/force`  | Force sync pending        | Admin   |
 
-### Classes
+---
 
-- id (UUID), name, description, teacherId, schedule, isActive, createdAt, updatedAt
+## 🗄️ Database Schema
 
-### ClassMembers
+```
+┌──────────┐     ┌──────────────┐     ┌──────────┐
+│  USERS   │────►│ CLASS_MEMBERS│◄────│ CLASSES  │
+│          │     └──────────────┘     │          │
+│  Admin   │            │             │ Halaqah  │
+│  Teacher │◄───────────┼─────────────┤          │
+│  Student │            │             └────┬─────┘
+│  Parent  │            │                  │
+└────┬─────┘            │                  │
+     │                  ▼                  │
+     │         ┌────────────────┐          │
+     └────────►│  ATTENDANCE    │◄─────────┘
+               └────────────────┘
 
-- id (UUID), classId, studentId, enrolledAt, createdAt, updatedAt
+     ┌─────────────────────┐     ┌──────────────┐
+     │  MEMORIZATION_LOGS  │────►│  ASSESSMENTS │
+     │                     │     │              │
+     │  Ziyadah/Murojaah   │     │  Tajwid      │
+     │  Surah + Ayat       │     │  Fashohah    │
+     └──────────┬──────────┘     │  Fluency     │
+                │                └──────────────┘
+                ▼
+         ┌────────────┐
+         │   SURAHS   │
+         │  (1-114)   │
+         └────────────┘
+```
 
-### Attendance
+📄 Dokumentasi lengkap: [docs/DATABASE.md](./docs/DATABASE.md)
 
-- id (UUID), studentId, classId, sessionType, status, proofUrl, notes, date, recordedBy, syncedAt, syncSource, createdAt, updatedAt
+---
 
-### MemorizationLogs
+## 🔐 Role-Based Access Control
 
-- id (UUID), studentId, type, surahId, startAyah, endAyah, teacherId, classId, sessionDate, notes, syncedAt, syncSource, createdAt, updatedAt
+| Role        | Akses                                        |
+| ----------- | -------------------------------------------- |
+| **Admin**   | Full access ke semua resource                |
+| **Teacher** | Kelola kehadiran & hafalan kelas yang diajar |
+| **Parent**  | Lihat data anak-anaknya saja                 |
+| **Student** | Lihat data diri sendiri saja                 |
 
-### Assessments
+---
 
-- id (UUID), logId, tajwidScore, fashohahScore, fluencyScore, totalScore, grade, notes, assessedBy, createdAt, updatedAt
+## 👤 Default Users
 
-### Surahs (Reference)
+Setelah menjalankan `npm run db:seed`:
 
-- id (1-114), name, arabicName, totalAyahs, juz
+| Email                 | Password     | Role    |
+| --------------------- | ------------ | ------- |
+| `admin@tahfidz.app`   | `admin123`   | Admin   |
+| `teacher@tahfidz.app` | `teacher123` | Teacher |
 
-## Offline Sync
+---
 
-The API supports offline-first applications using UUID-based sync:
+## 📱 Offline Sync
 
-1. Generate UUIDs client-side for new records
-2. Store records locally (Dexie/SQLite in Flutter)
-3. When online, POST to `/sync/attendance` or `/sync/tahfidz` with bulk data
-4. Server handles upsert based on UUID
+API mendukung aplikasi offline-first dengan UUID-based sync:
 
-## Google Sheets Integration
+1. **Generate UUID** di client untuk record baru
+2. **Simpan lokal** (Dexie.js / SQLite di Flutter)
+3. **Sync saat online** via `POST /sync/attendance` atau `POST /sync/tahfidz`
+4. **Server upsert** berdasarkan UUID
 
-1. Create a Google Sheet with sheets: Attendance, MemorizationLogs, Assessments
-2. Open Extensions > Apps Script
-3. Paste the code from `gas/Code.gs`
-4. Deploy as Web App
-5. Set the Web App URL in `.env` as `GAS_WEBHOOK_URL`
-6. Set matching API keys in both GAS and `.env`
+---
 
-## Role-Based Access Control
+## 📊 Google Sheets Integration
 
-| Role        | Permissions                                     |
-| ----------- | ----------------------------------------------- |
-| **Admin**   | Full access to all resources                    |
-| **Teacher** | Manage attendance, tahfidz for assigned classes |
-| **Parent**  | View their children's data only                 |
-| **Student** | View their own data only                        |
+1. Buat Google Sheet dengan sheets: `Attendance`, `MemorizationLogs`, `Assessments`
+2. Buka **Extensions > Apps Script**
+3. Paste kode dari `gas/Code.gs`
+4. Deploy sebagai Web App
+5. Set URL di `.env` sebagai `GAS_WEBHOOK_URL`
+6. Set API key yang sama di GAS dan `.env`
 
-## Default Users (after seeding)
+---
 
-| Email               | Password   | Role    |
-| ------------------- | ---------- | ------- |
-| admin@tahfidz.app   | admin123   | Admin   |
-| teacher@tahfidz.app | teacher123 | Teacher |
+## 📚 Documentation
 
-## License
+| Doc                                              | Description          |
+| ------------------------------------------------ | -------------------- |
+| [docs/DATABASE.md](./docs/DATABASE.md)           | ERD, schema, relasi  |
+| [docs/API.md](./docs/API.md)                     | API endpoint lengkap |
+| [docs/SQL_REFERENCE.md](./docs/SQL_REFERENCE.md) | SQL DDL & queries    |
 
-ISC
-#   b o o t c a m p - t a h f i d z  
- #   b o o t c a m p - t a h f i d z  
- #   b o o t c a m p - t a h f i d z  
- 
+---
+
+## 📝 License
+
+ISC © 2026 Zencode ID
