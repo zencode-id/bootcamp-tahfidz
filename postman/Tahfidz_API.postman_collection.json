@@ -524,6 +524,70 @@
       ]
     },
     {
+      "name": "🪝 Webhooks",
+      "item": [
+        {
+          "name": "Sync Status (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhook/sync/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhook", "sync", "status"]
+            }
+          }
+        },
+        {
+          "name": "Force Sync (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhook/sync/force",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhook", "sync", "force"]
+            }
+          }
+        },
+        {
+          "name": "GAS Webhook (Simulator)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "gas-api-key-secret"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"update\",\n  \"table\": \"attendance\",\n  \"data\": {\n    \"id\": \"attendance-uuid\",\n    \"studentId\": \"{{studentId}}\",\n    \"status\": \"present\",\n    \"date\": \"2026-01-31\",\n    \"sessionType\": \"subuh\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhook/gas",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhook", "gas"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "🔄 Health",
       "item": [
         {
