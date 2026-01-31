@@ -784,6 +784,31 @@ async function seed() {
       "✅ Sample teacher created: teacher@tahfidz.app / teacher123\n",
     );
 
+    // Create more sample teachers
+    console.log("👨‍🏫 Creating 10 sample teachers...");
+    const teachers = [];
+    for (let i = 1; i <= 10; i++) {
+      teachers.push({
+        name: `Ustadz ${i}`,
+        email: `teacher${i}@tahfidz.app`,
+        password: teacherPassword,
+        role: "teacher" as const,
+        isActive: i % 5 !== 0, // 20% teachers are inactive (Teacher 5, 10)
+        createdAt: new Date(
+          Date.now() - Math.floor(Math.random() * 10000000000),
+        ).toISOString(),
+      });
+    }
+
+    for (const teacher of teachers) {
+      try {
+        await db.insert(users).values(teacher).onConflictDoNothing();
+      } catch (e) {
+        // Ignore duplicates
+      }
+    }
+    console.log("✅ 10 Sample teachers created (some inactive)\n");
+
     // Create sample students (Bulk)
     console.log("🎓 Creating 50 sample students...");
     const studentPassword = await bcrypt.hash("student123", 12);
