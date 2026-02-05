@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Search, Plus, Trash2, Edit } from "lucide-react";
 import AdminLayout from "../components/layouts/AdminLayout";
-import { useUserStore } from "../store/userStore";
+import { useUserStore, type UserData } from "../store/userStore";
+import UserModal from "../components/modals/UserModal";
 
 const UsersPage: React.FC = () => {
-  const { users, fetchUsers, isLoading, deleteUser } = useUserStore();
+  const { users, fetchUsers, isLoading, createUser, updateUser, deleteUser } = useUserStore();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -16,6 +19,24 @@ const UsersPage: React.FC = () => {
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleAddUser = () => {
+    setSelectedUser(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditUser = (user: UserData) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (data: any) => {
+    if (selectedUser) {
+      return await updateUser(selectedUser.id, data);
+    } else {
+      return await createUser(data);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this user?")) {
@@ -37,7 +58,10 @@ const UsersPage: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+        <button
+          onClick={handleAddUser}
+          className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+        >
           <Plus size={18} />
           Add New User
         </button>
@@ -106,7 +130,10 @@ const UsersPage: React.FC = () => {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                        >
                           <Edit size={16} />
                         </button>
                         <button
@@ -124,6 +151,15 @@ const UsersPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* User Modal */}
+      <UserModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleSubmit}
+        user={selectedUser}
+        isLoading={isLoading}
+      />
     </AdminLayout>
   );
 };
