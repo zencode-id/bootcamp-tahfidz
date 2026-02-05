@@ -117,35 +117,20 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     throw new HTTPException(401, { message: "Invalid email or password" });
   }
 
-  // Generate OTP
-  const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
-
-  // Save OTP to DB
-  await db.otpCodes.create({
-    userId: user.id,
-    code: otp,
-    expiresAt: expiresAt.getTime(), // Store as timestamp
-  });
-
-  // DEV: Log OTP to console
-  console.log(`[DEV] OTP for ${user.email}: ${otp}`);
-
-  // Send OTP via Brevo
-  try {
-    await sendOtpEmail(user.email, otp, user.name);
-  } catch (error) {
-    console.error("Failed to send email", error);
-    // For dev, we might still want to proceed or return error?
-    // throw new HTTPException(500, { message: "Failed to send OTP email" });
-  }
+  // Generate Token directly (No OTP)
+  const token = generateToken(user as User);
 
   return c.json({
     success: true,
-    message: "OTP sent to email",
+    message: "Login successful",
     data: {
-      email: user.email,
-      role: user.role, // Return role so frontend knows where to redirect after verification? Or maybe wait until verify to return sensitive info.
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      token,
     },
   });
 });
@@ -310,7 +295,7 @@ auth.get("/users", authMiddleware, adminOnly, async (c) => {
 
   // 1. Fetch All (filtered by role if possible to reduce load, but our simple client supports simple object match)
   // For searching and complex filtering, we fetch all first.
-  let allUsers: any[] = await db.users.findMany({});
+  let allUsers: any[] = await db.users.findMany({}, 1000);
 
   // 2. Filter in Memory
   if (role) {
@@ -358,6 +343,50 @@ auth.get("/users", authMiddleware, adminOnly, async (c) => {
       totalPages: Math.ceil(total / limit),
     },
   });
+});
+
+// POST /auth/users - Create new user (admin only)
+auth.post("/users", authMiddleware, adminOnly, async (c) => {
+  const body = await c.req.json();
+
+  // Validate required fields
+  if (!body.name || !body.email || !body.password) {
+    throw new HTTPException(400, {
+      message: "Name, email, and password are required",
+    });
+  }
+
+  // Check if email already exists
+  const existingUser = await db.users.findFirst({ email: body.email.toLowerCase() });
+  if (existingUser) {
+    throw new HTTPException(400, { message: "Email already exists" });
+  }
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(body.password, 10);
+
+  // Create user
+  const newUser = await db.users.create({
+    name: body.name,
+    email: body.email.toLowerCase(),
+    password: hashedPassword,
+    role: body.role || "student",
+    isActive: body.isActive !== false,
+    phone: body.phone || "",
+    address: body.address || "",
+    parentId: body.parentId || null,
+  });
+
+  const { password, ...safeUser } = newUser;
+
+  return c.json(
+    {
+      success: true,
+      message: "User created successfully",
+      data: safeUser,
+    },
+    201
+  );
 });
 
 // GET /auth/users/:id - Get user by ID (admin only)

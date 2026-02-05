@@ -4,6 +4,7 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
+import { Toaster } from "sonner";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import OTP from "./pages/OTP";
@@ -13,28 +14,33 @@ import DummyDashboard from "./pages/DummyDashboard";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import UsersPage from "./pages/UsersPage";
+import ClassesPage from "./pages/ClassesPage";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/otp" element={<OTP />} />
-        <Route path="/reset-password" element={<ForgotPassword />} />
+    <>
+      <Toaster position="top-right" richColors />
+      <Router>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/otp" element={<OTP />} />
+          <Route path="/reset-password" element={<ForgotPassword />} />
 
-        <Route path="/dashboard" element={<Home />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<UsersPage />} />
-        <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-        <Route path="/parent/dashboard" element={<ParentDashboard />} />
+          <Route path="/dashboard" element={<Home />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/classes" element={<ClassesPage />} />
+          <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+          <Route path="/parent/dashboard" element={<ParentDashboard />} />
 
-        <Route path="/dummy" element={<DummyDashboard />} />
-      </Routes>
-    </Router>
+          <Route path="/dummy" element={<DummyDashboard />} />
+        </Routes>
+      </Router>
+    </>
   );
 }
 

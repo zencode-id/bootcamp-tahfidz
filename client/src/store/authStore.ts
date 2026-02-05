@@ -24,11 +24,40 @@ interface AuthState {
   setError: (error: string | null) => void;
 }
 
+// Initialize from localStorage
+const getInitialState = () => {
+  try {
+    const stored = localStorage.getItem("auth_storage");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const now = new Date().getTime();
+      if (now < parsed.expiry) {
+        return {
+          user: parsed.user,
+          token: parsed.token,
+          isAuthenticated: true,
+          sessionExpiry: parsed.expiry,
+        };
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    sessionExpiry: null,
+  };
+};
+
+const initialState = getInitialState();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  token: null,
-  sessionExpiry: null,
+  user: initialState.user,
+  isAuthenticated: initialState.isAuthenticated,
+  token: initialState.token,
+  sessionExpiry: initialState.sessionExpiry,
   isLoading: false,
   error: null,
 
@@ -48,7 +77,23 @@ export const useAuthStore = create<AuthState>((set) => ({
         throw new Error(data.message || data.error || "Login failed");
       }
 
-      set({ isLoading: false });
+      // Handle direct login success (Token received)
+      const { user, token } = data.data;
+      const expiry = new Date().getTime() + 4 * 60 * 60 * 1000; // 4 hours
+
+      localStorage.setItem(
+        "auth_storage",
+        JSON.stringify({ user, token, expiry }),
+      );
+
+      set({
+        user,
+        token,
+        isAuthenticated: true,
+        sessionExpiry: expiry,
+        isLoading: false
+      });
+
       return true;
     } catch (err) {
       set({

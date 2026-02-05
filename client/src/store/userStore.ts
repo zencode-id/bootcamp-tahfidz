@@ -45,7 +45,8 @@ export const useUserStore = create<UserState>((set, get) => ({
         return;
       }
 
-      const response = await fetch(`${API_URL}/auth/users`, {
+      // Fetch all users (limit=1000) so client-side search works
+      const response = await fetch(`${API_URL}/auth/users?limit=1000`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
@@ -69,6 +70,14 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const token = useAuthStore.getState().token;
+      console.log('[createUser] Token:', token ? 'PRESENT' : 'MISSING');
+      console.log('[createUser] Sending data:', userData);
+
+      if (!token) {
+        set({ error: "No authentication token. Please login again." });
+        return false;
+      }
+
       const response = await fetch(`${API_URL}/auth/users`, {
         method: "POST",
         headers: {
@@ -78,17 +87,20 @@ export const useUserStore = create<UserState>((set, get) => ({
         body: JSON.stringify(userData),
       });
 
+      console.log('[createUser] Response status:', response.status);
       const data = await response.json();
+      console.log('[createUser] Response data:', data);
 
       if (data.success) {
         // Refresh list
         await get().fetchUsers();
         return true;
       } else {
-        set({ error: data.message });
+        set({ error: data.message || data.error || "Failed to create user" });
         return false;
       }
     } catch (err: any) {
+      console.error('[createUser] Error:', err);
       set({ error: err.message });
       return false;
     } finally {

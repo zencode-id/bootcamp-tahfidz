@@ -20,8 +20,14 @@ const Login: React.FC = () => {
 
     const success = await loginWithPassword(email, password);
     if (success) {
-      // Navigate to OTP for MFA
-      navigate("/otp", { state: { email, role, flow: "login" } });
+      // Navigate to dashboard
+      // TODO: Handle routing based on role (e.g. /teacher/dashboard, /student/dashboard)
+      if (role === 'admin') {
+         navigate("/admin/dashboard");
+      } else {
+         // Fallback or specific routes
+         navigate("/admin/dashboard"); // reusing admin layout for now or as placeholder
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Search, Plus, Trash2, Edit } from "lucide-react";
+import { toast } from "sonner";
 import AdminLayout from "../components/layouts/AdminLayout";
 import { useUserStore, type UserData } from "../store/userStore";
 import UserModal from "../components/modals/UserModal";
@@ -10,15 +11,28 @@ const UsersPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddUser = () => {
     setSelectedUser(null);
@@ -31,16 +45,38 @@ const UsersPage: React.FC = () => {
   };
 
   const handleSubmit = async (data: any) => {
-    if (selectedUser) {
-      return await updateUser(selectedUser.id, data);
-    } else {
-      return await createUser(data);
+    try {
+      if (selectedUser) {
+        const success = await updateUser(selectedUser.id, data);
+        if (success) {
+          toast.success("User updated successfully!");
+        } else {
+          toast.error("Failed to update user");
+        }
+        return success;
+      } else {
+        const success = await createUser(data);
+        if (success) {
+          toast.success("User created successfully!");
+        } else {
+          toast.error("Failed to create user");
+        }
+        return success;
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+      return false;
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this user?")) {
-      await deleteUser(id);
+      const success = await deleteUser(id);
+      if (success) {
+        toast.success("User deleted successfully!");
+      } else {
+        toast.error("Failed to delete user");
+      }
     }
   };
 
@@ -68,7 +104,7 @@ const UsersPage: React.FC = () => {
       </div>
 
       {/* Users Table */}
-      <div className="glass-panel overflow-hidden">
+      <div className="glass-panel overflow-hidden mb-6">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -94,8 +130,8 @@ const UsersPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                paginatedUsers.map((user, index) => (
+                  <tr key={`${user.id}-${index}`} className="hover:bg-white/5 transition-colors">
                     <td className="p-4 text-white">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold border border-white/10">
@@ -151,6 +187,44 @@ const UsersPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {!isLoading && filteredUsers.length > itemsPerPage && (
+        <div className="flex justify-between items-center text-sm text-slate-400">
+          <div>
+            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredUsers.length)} of {filteredUsers.length} users
+          </div>
+          <div className="flex gap-2">
+             <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+             >
+               Previous
+             </button>
+             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-1 rounded transition-colors ${
+                    currentPage === page
+                      ? "bg-indigo-500 text-white"
+                      : "bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  {page}
+                </button>
+             ))}
+             <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+             >
+               Next
+             </button>
+          </div>
+        </div>
+      )}
 
       {/* User Modal */}
       <UserModal

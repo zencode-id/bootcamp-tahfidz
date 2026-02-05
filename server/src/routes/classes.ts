@@ -366,4 +366,94 @@ classRoutes.delete("/:id/members/:studentId", teacherOrAdmin, async (c) => {
   });
 });
 
+// ============================================
+// POST /classes/:id/transfer - Transfer student to another class
+// ============================================
+classRoutes.post("/:id/transfer", teacherOrAdmin, async (c) => {
+  const { id: fromClassId } = c.req.param();
+  const { studentId, toClassId } = await c.req.json();
+
+  if (!studentId || !toClassId) {
+    throw new HTTPException(400, { message: "studentId and toClassId are required" });
+  }
+
+  // Verify source class exists
+  const fromClass = await db.classes.findFirst({ id: fromClassId });
+  if (!fromClass) {
+    throw new HTTPException(404, { message: "Source class not found" });
+  }
+
+  // Verify destination class exists
+  const toClass = await db.classes.findFirst({ id: toClassId });
+  if (!toClass) {
+    throw new HTTPException(404, { message: "Destination class not found" });
+  }
+
+  // Check if student is in source class
+  const existingMembership = await db.classMembers.findMany({
+    classId: fromClassId,
+    studentId: studentId
+  });
+
+  if (existingMembership.length === 0) {
+    throw new HTTPException(400, { message: "Student is not in source class" });
+  }
+
+  // Check if already in destination class
+  const destMembership = await db.classMembers.findMany({
+    classId: toClassId,
+    studentId: studentId
+  });
+
+  // Remove from source class
+  await db.classMembers.delete(existingMembership[0].id);
+
+  // Add to destination class (if not already there)
+  if (destMembership.length === 0) {
+    await db.classMembers.create({
+      classId: toClassId,
+      studentId: studentId,
+      joinedAt: new Date().toISOString()
+    });
+  }
+
+  return c.json({
+    success: true,
+    message: `Student transferred from ${fromClass.name} to ${toClass.name}`,
+  });
+});
+
+// ============================================
+// POST /classes/cleanup-inactive - Remove inactive students from all classes
+// ============================================
+classRoutes.post("/cleanup-inactive", adminOnly, async (c) => {
+  const allUsers = await db.users.findMany({}, 1000);
+  const allMembers = await db.classMembers.findMany({}, 1000);
+
+  // Find inactive user IDs
+  const inactiveUserIds = allUsers
+    .filter((u: any) => {
+      const isActive = u.isActive === true || u.isActive === "true" || u.isActive === "TRUE";
+      return !isActive;
+    })
+    .map((u: any) => u.id);
+
+  // Find memberships where studentId is inactive
+  const membershipsToRemove = allMembers.filter((m: any) =>
+    inactiveUserIds.includes(m.studentId)
+  );
+
+  let removedCount = 0;
+  for (const membership of membershipsToRemove) {
+    await db.classMembers.delete(membership.id);
+    removedCount++;
+  }
+
+  return c.json({
+    success: true,
+    message: `Removed ${removedCount} inactive students from classes`,
+    removedCount,
+  });
+});
+
 export default classRoutes;
