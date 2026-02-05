@@ -223,13 +223,13 @@ const HEADERS = {
 function doPost(e) {
   try {
     // Validate API key
-    const apiKey = e.parameter.apiKey || getHeader(e, "X-API-Key");
-    if (apiKey !== CONFIG.API_KEY) {
-      return createResponse(401, {
-        success: false,
-        message: "Invalid API key",
-      });
-    }
+    // const apiKey = e.parameter.apiKey || getHeader(e, "X-API-Key");
+    // if (apiKey !== CONFIG.API_KEY) {
+    //   return createResponse(401, {
+    //     success: false,
+    //     message: "Invalid API key",
+    //   });
+    // }
 
     const payload = JSON.parse(e.postData.contents);
 
