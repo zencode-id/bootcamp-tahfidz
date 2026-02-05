@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db, attendance } from "../db/index.js";
+import { db } from "../lib/gasClient.js";
 import {
   bulkAttendanceSchema,
   attendanceItemSchema,
@@ -14,7 +13,6 @@ import {
   canAccessStudent,
   getAccessibleStudentIds,
 } from "../middleware/auth.js";
-import { syncService } from "../services/sync.js";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
 
@@ -24,7 +22,7 @@ const sync = new Hono();
 sync.use("*", authMiddleware);
 
 // ============================================
-// POST /sync/attendance - Bulk sync attendance (offline sync)
+// POST /sync/attendance - Bulk sync attendance
 // ============================================
 sync.post(
   "/attendance",
@@ -42,15 +40,7 @@ sync.post(
 
     for (const item of items) {
       try {
-        // Generate UUID if not provided (for new records)
         const recordId = item.id || uuidv4();
-
-        // Check if record exists
-        const existing = item.id
-          ? await db.query.attendance.findFirst({
-              where: eq(attendance.id, item.id),
-            })
-          : null;
 
         const attendanceData = {
           id: recordId,
@@ -66,37 +56,14 @@ sync.post(
           syncSource: item.syncSource || "app",
         };
 
+        const existing = await db.attendance.findFirst({ id: item.id });
+
         if (existing) {
-          // Update existing record
-          await db
-            .update(attendance)
-            .set({
-              ...attendanceData,
-              updatedAt: new Date().toISOString(),
-            })
-            .where(eq(attendance.id, item.id!));
-
-          results.updated++;
-
-          // Queue for GSheet sync
-          await syncService.queueSync(
-            "attendance",
-            item.id!,
-            "update",
-            attendanceData,
-          );
+            await db.attendance.update(item.id!, attendanceData);
+            results.updated++;
         } else {
-          // Insert new record
-          await db.insert(attendance).values(attendanceData);
-          results.created++;
-
-          // Queue for GSheet sync
-          await syncService.queueSync(
-            "attendance",
-            recordId,
-            "create",
-            attendanceData,
-          );
+            await db.attendance.create(attendanceData);
+            results.created++;
         }
       } catch (error) {
         results.errors.push({
@@ -127,76 +94,46 @@ sync.get(
     // Get accessible student IDs based on user role
     const accessibleIds = await getAccessibleStudentIds(auth);
 
-    // Build where conditions
-    const conditions = [];
+    // Fetch all attendance
+    let data = await db.attendance.findMany({});
 
-    // Filter by accessible students
+    // Filter by accessibility
     if (accessibleIds !== "all") {
-      if (accessibleIds.length === 0) {
-        return c.json({
-          success: true,
-          data: [],
-          pagination: { page: query.page, limit: query.limit, total: 0 },
-        });
-      }
-      conditions.push(inArray(attendance.studentId, accessibleIds));
+        if (accessibleIds.length === 0) {
+             return c.json({ success: true, data: [], pagination: { page: query.page, limit: query.limit, total: 0 } });
+        }
+        data = data.filter((a: any) => accessibleIds.includes(a.studentId));
     }
 
-    // Apply filters
+    // Apply filters matching query params
     if (query.studentId) {
-      // Verify access to this student
-      if (accessibleIds !== "all" && !accessibleIds.includes(query.studentId)) {
-        throw new HTTPException(403, {
-          message: "Access denied to this student's data",
-        });
-      }
-      conditions.push(eq(attendance.studentId, query.studentId));
+        if (accessibleIds !== "all" && !accessibleIds.includes(query.studentId)) {
+            throw new HTTPException(403, { message: "Access denied" });
+        }
+        data = data.filter((a: any) => a.studentId === query.studentId);
     }
 
-    if (query.classId) {
-      conditions.push(eq(attendance.classId, query.classId));
-    }
+    if (query.classId) data = data.filter((a: any) => a.classId === query.classId);
+    if (query.sessionType) data = data.filter((a: any) => a.sessionType === query.sessionType);
+    if (query.status) data = data.filter((a: any) => a.status === query.status);
+    if (query.startDate) data = data.filter((a: any) => a.date >= query.startDate!);
+    if (query.endDate) data = data.filter((a: any) => a.date <= query.endDate!);
 
-    if (query.sessionType) {
-      conditions.push(eq(attendance.sessionType, query.sessionType));
-    }
-
-    if (query.status) {
-      conditions.push(eq(attendance.status, query.status));
-    }
-
-    if (query.startDate) {
-      conditions.push(gte(attendance.date, query.startDate));
-    }
-
-    if (query.endDate) {
-      conditions.push(lte(attendance.date, query.endDate));
-    }
-
-    // Get total count
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(attendance)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    const total = countResult[0]?.count || 0;
-
-    // Get paginated data
+    const total = data.length;
     const offset = (query.page - 1) * query.limit;
 
-    const data = await db.query.attendance.findMany({
-      where: conditions.length > 0 ? and(...conditions) : undefined,
-      limit: query.limit,
-      offset,
-      orderBy: (attendance, { desc }) => [
-        desc(attendance.date),
-        desc(attendance.createdAt),
-      ],
+    // Sort
+    data.sort((a: any, b: any) => {
+        const dateDiff = b.date.localeCompare(a.date);
+        if (dateDiff !== 0) return dateDiff;
+        return (b.createdAt || "").localeCompare(a.createdAt || "");
     });
+
+    const paginatedData = data.slice(offset, offset + query.limit);
 
     return c.json({
       success: true,
-      data,
+      data: paginatedData,
       pagination: {
         page: query.page,
         limit: query.limit,
@@ -214,9 +151,7 @@ sync.get("/attendance/:id", async (c) => {
   const { id } = c.req.param();
   const auth = c.get("auth");
 
-  const record = await db.query.attendance.findFirst({
-    where: eq(attendance.id, id),
-  });
+  const record = await db.attendance.findFirst({ id: id });
 
   if (!record) {
     throw new HTTPException(404, { message: "Attendance record not found" });
@@ -246,9 +181,7 @@ sync.put(
     const body = c.req.valid("json");
     const { user } = c.get("auth");
 
-    const existing = await db.query.attendance.findFirst({
-      where: eq(attendance.id, id),
-    });
+    const existing = await db.attendance.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Attendance record not found" });
@@ -266,14 +199,7 @@ sync.put(
       updatedAt: new Date().toISOString(),
     };
 
-    const [updated] = await db
-      .update(attendance)
-      .set(updatedData)
-      .where(eq(attendance.id, id))
-      .returning();
-
-    // Queue for GSheet sync
-    await syncService.queueSync("attendance", id, "update", updatedData);
+    const updated = await db.attendance.update(id, updatedData);
 
     return c.json({
       success: true,
@@ -294,25 +220,13 @@ sync.patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.attendance.findFirst({
-      where: eq(attendance.id, id),
-    });
+    const existing = await db.attendance.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Attendance record not found" });
     }
 
-    const [updated] = await db
-      .update(attendance)
-      .set({
-        ...body,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(attendance.id, id))
-      .returning();
-
-    // Queue for GSheet sync
-    await syncService.queueSync("attendance", id, "update", body);
+    const updated = await db.attendance.update(id, body);
 
     return c.json({
       success: true,
@@ -328,18 +242,13 @@ sync.patch(
 sync.delete("/attendance/:id", teacherOrAdmin, async (c) => {
   const { id } = c.req.param();
 
-  const existing = await db.query.attendance.findFirst({
-    where: eq(attendance.id, id),
-  });
+  const existing = await db.attendance.findFirst({ id: id });
 
   if (!existing) {
     throw new HTTPException(404, { message: "Attendance record not found" });
   }
 
-  await db.delete(attendance).where(eq(attendance.id, id));
-
-  // Queue for GSheet sync
-  await syncService.queueSync("attendance", id, "delete", { id });
+  await db.attendance.delete(id);
 
   return c.json({
     success: true,

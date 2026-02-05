@@ -13,12 +13,12 @@ import syncRoutes from "./routes/sync.js";
 import tahfidzRoutes from "./routes/tahfidz.js";
 import statsRoutes from "./routes/stats.js";
 import classRoutes from "./routes/classes.js";
-import webhookRoutes from "./routes/webhook.js";
 import examRoutes from "./routes/exams.js";
 import reportRoutes from "./routes/reports.js";
 
 // Import DB to initialize on startup
-import "./db/index.js";
+// Import DB to initialize on startup
+// import "./db/index.js"; // Removed for GAS migration
 
 // Create Hono app
 const app = new Hono();
@@ -107,7 +107,7 @@ app.get("/", (c) => {
       classes: "/classes",
       exams: "/exams",
       reports: "/reports",
-      webhook: "/webhook",
+      // webhook: "/webhook",
     },
   });
 });
@@ -130,7 +130,8 @@ app.route("/stats", statsRoutes);
 app.route("/classes", classRoutes);
 app.route("/exams", examRoutes);
 app.route("/reports", reportRoutes);
-app.route("/webhook", webhookRoutes);
+app.route("/reports", reportRoutes);
+// app.route("/webhook", webhookRoutes);
 
 // ============================================
 // 404 HANDLER

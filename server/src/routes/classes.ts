@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, sql } from "drizzle-orm";
-import { db, classes, classMembers, users } from "../db/index.js";
+import { db } from "../lib/gasClient.js";
 import {
   createClassSchema,
   updateClassSchema,
@@ -13,6 +12,7 @@ import {
 } from "../middleware/auth.js";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
+import { Class, User, ClassMember } from "../types/index.js";
 
 const classRoutes = new Hono();
 
@@ -25,58 +25,61 @@ classRoutes.use("*", authMiddleware);
 classRoutes.get("/", async (c) => {
   const { user } = c.get("auth");
 
-  let allClasses;
+  let allClasses: any[] = [];
 
   if (user.role === "admin") {
     // Admin can see all classes
-    allClasses = await db.query.classes.findMany({
-      orderBy: (classes, { desc }) => [desc(classes.createdAt)],
-    });
+    allClasses = await db.classes.findMany({});
   } else if (user.role === "teacher") {
     // Teachers see classes they teach
-    allClasses = await db.query.classes.findMany({
-      where: eq(classes.teacherId, user.id),
-      orderBy: (classes, { desc }) => [desc(classes.createdAt)],
+    allClasses = await db.classes.findMany({
+      teacherId: user.id
     });
   } else {
     // Students and parents see classes they're enrolled in
-    const enrollments = await db.query.classMembers.findMany({
-      where: eq(classMembers.studentId, user.id),
+    // 1. Get enrollments
+    const enrollments = await db.classMembers.findMany({
+      studentId: user.id
     });
 
-    const classIds = enrollments.map((e) => e.classId);
+    const classIds = enrollments.map((e: any) => e.classId);
 
     if (classIds.length === 0) {
       return c.json({ success: true, data: [], total: 0 });
     }
 
-    allClasses = await db.query.classes.findMany({
-      where: sql`${classes.id} IN (${classIds.map((id) => `'${id}'`).join(",")})`,
-    });
+    // 2. Fetch all classes and filter (GAS limit)
+    const rawClasses = await db.classes.findMany({});
+    allClasses = rawClasses.filter((cls: any) => classIds.includes(cls.id));
   }
 
   // Get teacher names and member counts
   const classesWithDetails = await Promise.all(
     allClasses.map(async (cls) => {
-      const teacher = cls.teacherId
-        ? await db.query.users.findFirst({
-            where: eq(users.id, cls.teacherId),
-            columns: { id: true, name: true, email: true },
-          })
-        : null;
+      let teacher = null;
+      if (cls.teacherId) {
+          teacher = await db.users.findFirst({ id: cls.teacherId });
+          if (teacher) {
+              teacher = { id: teacher.id, name: teacher.name, email: teacher.email };
+          }
+      }
 
-      const memberCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(classMembers)
-        .where(eq(classMembers.classId, cls.id));
+      // Member count - inefficient but functional for MVP serverless
+      const members = await db.classMembers.findMany({ classId: cls.id });
+      const memberCount = members.length;
 
       return {
         ...cls,
         teacher,
-        memberCount: memberCount[0]?.count || 0,
+        memberCount: memberCount,
       };
     }),
   );
+
+  // Sort desc by createdAt
+  classesWithDetails.sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
 
   return c.json({
     success: true,
@@ -97,16 +100,19 @@ classRoutes.post(
 
     // Verify teacher exists if provided
     if (body.teacherId) {
-      const teacher = await db.query.users.findFirst({
-        where: and(eq(users.id, body.teacherId), eq(users.role, "teacher")),
+      const teacher = await db.users.findFirst({
+         id: body.teacherId
       });
 
-      if (!teacher) {
+      if (!teacher || teacher.role !== 'teacher') {
         throw new HTTPException(400, { message: "Invalid teacher ID" });
       }
     }
 
-    const [newClass] = await db.insert(classes).values(body).returning();
+    const newClass = await db.classes.create({
+        ...body,
+        isActive: true
+    });
 
     return c.json(
       {
@@ -125,8 +131,8 @@ classRoutes.post(
 classRoutes.get("/:id", async (c) => {
   const { id } = c.req.param();
 
-  const cls = await db.query.classes.findFirst({
-    where: eq(classes.id, id),
+  const cls = await db.classes.findFirst({
+    id: id,
   });
 
   if (!cls) {
@@ -134,27 +140,30 @@ classRoutes.get("/:id", async (c) => {
   }
 
   // Get teacher
-  const teacher = cls.teacherId
-    ? await db.query.users.findFirst({
-        where: eq(users.id, cls.teacherId),
-        columns: { id: true, name: true, email: true },
-      })
-    : null;
+  let teacher = null;
+  if (cls.teacherId) {
+    const teacherUser = await db.users.findFirst({ id: cls.teacherId });
+    if(teacherUser) {
+        teacher = { id: teacherUser.id, name: teacherUser.name, email: teacherUser.email };
+    }
+  }
 
   // Get members
-  const members = await db.query.classMembers.findMany({
-    where: eq(classMembers.classId, id),
+  const members = await db.classMembers.findMany({
+    classId: id
   });
 
   const studentsWithDetails = await Promise.all(
-    members.map(async (member) => {
-      const student = await db.query.users.findFirst({
-        where: eq(users.id, member.studentId),
-        columns: { id: true, name: true, email: true },
+    members.map(async (member: any) => {
+      const student = await db.users.findFirst({
+        id: member.studentId
       });
+
+      const safeStudent = student ? { id: student.id, name: student.name, email: student.email } : null;
+
       return {
         ...member,
-        student,
+        student: safeStudent,
       };
     }),
   );
@@ -181,8 +190,8 @@ classRoutes.put(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.classes.findFirst({
-      where: eq(classes.id, id),
+    const existing = await db.classes.findFirst({
+      id: id,
     });
 
     if (!existing) {
@@ -191,23 +200,16 @@ classRoutes.put(
 
     // Verify teacher if provided
     if (body.teacherId) {
-      const teacher = await db.query.users.findFirst({
-        where: and(eq(users.id, body.teacherId), eq(users.role, "teacher")),
+      const teacher = await db.users.findFirst({
+         id: body.teacherId
       });
 
-      if (!teacher) {
+      if (!teacher || teacher.role !== 'teacher') {
         throw new HTTPException(400, { message: "Invalid teacher ID" });
       }
     }
 
-    const [updated] = await db
-      .update(classes)
-      .set({
-        ...body,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(classes.id, id))
-      .returning();
+    const updated = await db.classes.update(id, body);
 
     return c.json({
       success: true,
@@ -228,22 +230,15 @@ classRoutes.patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.classes.findFirst({
-      where: eq(classes.id, id),
+    const existing = await db.classes.findFirst({
+      id: id,
     });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Class not found" });
     }
 
-    const [updated] = await db
-      .update(classes)
-      .set({
-        ...body,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(classes.id, id))
-      .returning();
+    const updated = await db.classes.update(id, body);
 
     return c.json({
       success: true,
@@ -259,8 +254,8 @@ classRoutes.patch(
 classRoutes.delete("/:id", adminOnly, async (c) => {
   const { id } = c.req.param();
 
-  const existing = await db.query.classes.findFirst({
-    where: eq(classes.id, id),
+  const existing = await db.classes.findFirst({
+    id: id,
   });
 
   if (!existing) {
@@ -268,8 +263,12 @@ classRoutes.delete("/:id", adminOnly, async (c) => {
   }
 
   // Delete class members first
-  await db.delete(classMembers).where(eq(classMembers.classId, id));
-  await db.delete(classes).where(eq(classes.id, id));
+  const members = await db.classMembers.findMany({ classId: id });
+  for (const member of members) {
+      await db.classMembers.delete(member.id);
+  }
+
+  await db.classes.delete(id);
 
   return c.json({
     success: true,
@@ -289,8 +288,8 @@ classRoutes.post(
     const { studentId } = c.req.valid("json");
 
     // Verify class exists
-    const cls = await db.query.classes.findFirst({
-      where: eq(classes.id, classId),
+    const cls = await db.classes.findFirst({
+      id: classId,
     });
 
     if (!cls) {
@@ -298,37 +297,36 @@ classRoutes.post(
     }
 
     // Verify student exists
-    const student = await db.query.users.findFirst({
-      where: and(eq(users.id, studentId), eq(users.role, "student")),
+    const student = await db.users.findFirst({
+      id: studentId
     });
 
-    if (!student) {
+    if (!student || student.role !== 'student') {
       throw new HTTPException(400, {
         message: "Invalid student ID or user is not a student",
       });
     }
 
-    // Check if already enrolled
-    const existing = await db.query.classMembers.findFirst({
-      where: and(
-        eq(classMembers.classId, classId),
-        eq(classMembers.studentId, studentId),
-      ),
+    // Check if already enrolled (Fetch all members of this class and check)
+    // GASClient findMany with multiple conditions support check:
+    // If our GAS script only supports simple AND, we can try { classId, studentId }
+    // My previous GAS script update handles this if key-values match row.
+    const existingMembers = await db.classMembers.findMany({
+        classId: classId,
+        studentId: studentId
     });
 
-    if (existing) {
+    if (existingMembers.length > 0) {
       throw new HTTPException(400, {
         message: "Student is already enrolled in this class",
       });
     }
 
-    const [member] = await db
-      .insert(classMembers)
-      .values({
+    const member = await db.classMembers.create({
         classId,
         studentId,
-      })
-      .returning();
+        joinedAt: new Date().toISOString()
+    });
 
     return c.json(
       {
@@ -347,27 +345,20 @@ classRoutes.post(
 classRoutes.delete("/:id/members/:studentId", teacherOrAdmin, async (c) => {
   const { id: classId, studentId } = c.req.param();
 
-  const existing = await db.query.classMembers.findFirst({
-    where: and(
-      eq(classMembers.classId, classId),
-      eq(classMembers.studentId, studentId),
-    ),
+  const existingMembers = await db.classMembers.findMany({
+      classId: classId,
+      studentId: studentId
   });
 
-  if (!existing) {
+  if (existingMembers.length === 0) {
     throw new HTTPException(404, {
       message: "Student not found in this class",
     });
   }
 
-  await db
-    .delete(classMembers)
-    .where(
-      and(
-        eq(classMembers.classId, classId),
-        eq(classMembers.studentId, studentId),
-      ),
-    );
+  const memberToDelete = existingMembers[0]; // Should be unique
+
+  await db.classMembers.delete(memberToDelete.id);
 
   return c.json({
     success: true,

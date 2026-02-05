@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { eq, and, sql, inArray } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db, memorizationLogs, assessments, surahs } from "../db/index.js";
+import { db } from "../lib/gasClient.js";
 import {
   bulkTahfidzSchema,
   memorizationLogItemSchema,
@@ -17,7 +16,6 @@ import {
   canAccessStudent,
   getAccessibleStudentIds,
 } from "../middleware/auth.js";
-import { syncService } from "../services/sync.js";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -65,12 +63,6 @@ tahfidz.post(
       try {
         const recordId = log.id || uuidv4();
 
-        const existing = log.id
-          ? await db.query.memorizationLogs.findFirst({
-              where: eq(memorizationLogs.id, log.id),
-            })
-          : null;
-
         const logData = {
           id: recordId,
           studentId: log.studentId,
@@ -86,28 +78,15 @@ tahfidz.post(
           syncSource: log.syncSource || "app",
         };
 
-        if (existing) {
-          await db
-            .update(memorizationLogs)
-            .set({ ...logData, updatedAt: new Date().toISOString() })
-            .where(eq(memorizationLogs.id, log.id!));
+        // Attempt to find existing (fetch all or findFirst if supported)
+        const existing = await db.memorizationLogs.findFirst({ id: log.id });
 
+        if (existing) {
+          await db.memorizationLogs.update(log.id!, logData);
           results.logs.updated++;
-          await syncService.queueSync(
-            "memorization_logs",
-            log.id!,
-            "update",
-            logData,
-          );
         } else {
-          await db.insert(memorizationLogs).values(logData);
+          await db.memorizationLogs.create(logData);
           results.logs.created++;
-          await syncService.queueSync(
-            "memorization_logs",
-            recordId,
-            "create",
-            logData,
-          );
         }
       } catch (error) {
         results.logs.errors.push({
@@ -121,12 +100,6 @@ tahfidz.post(
     for (const assessment of assessmentItems) {
       try {
         const recordId = assessment.id || uuidv4();
-
-        const existing = assessment.id
-          ? await db.query.assessments.findFirst({
-              where: eq(assessments.id, assessment.id),
-            })
-          : null;
 
         const totalScore =
           (assessment.tajwidScore +
@@ -146,28 +119,14 @@ tahfidz.post(
           assessedBy: assessment.assessedBy || user.id,
         };
 
-        if (existing) {
-          await db
-            .update(assessments)
-            .set({ ...assessmentData, updatedAt: new Date().toISOString() })
-            .where(eq(assessments.id, assessment.id!));
+        const existing = await db.assessments.findFirst({ id: assessment.id });
 
+        if (existing) {
+          await db.assessments.update(assessment.id!, assessmentData);
           results.assessments.updated++;
-          await syncService.queueSync(
-            "assessments",
-            assessment.id!,
-            "update",
-            assessmentData,
-          );
         } else {
-          await db.insert(assessments).values(assessmentData);
+          await db.assessments.create(assessmentData);
           results.assessments.created++;
-          await syncService.queueSync(
-            "assessments",
-            recordId,
-            "create",
-            assessmentData,
-          );
         }
       } catch (error) {
         results.assessments.errors.push({
@@ -185,7 +144,7 @@ tahfidz.post(
   },
 );
 
-// Query schema for memorization logs
+// Query schema
 const memorizationQuerySchema = paginationSchema.merge(dateRangeSchema).extend({
   studentId: z.string().uuid().optional(),
   type: z.enum(["ziyadah", "murojaah"]).optional(),
@@ -204,55 +163,45 @@ tahfidz.get(
 
     const accessibleIds = await getAccessibleStudentIds(auth);
 
-    const conditions = [];
-
-    if (accessibleIds !== "all") {
-      if (accessibleIds.length === 0) {
-        return c.json({
-          success: true,
-          data: [],
-          pagination: { page: query.page, limit: query.limit, total: 0 },
-        });
-      }
-      conditions.push(inArray(memorizationLogs.studentId, accessibleIds));
-    }
+    // Fetch all logs then filter
+    // GASClient limitation means we fetch all logs if we can't filter server-side
+    // Optimization: If query.studentId is provided, fetch by studentId.
+    let logs = [];
 
     if (query.studentId) {
-      if (accessibleIds !== "all" && !accessibleIds.includes(query.studentId)) {
-        throw new HTTPException(403, { message: "Access denied" });
-      }
-      conditions.push(eq(memorizationLogs.studentId, query.studentId));
+        if (accessibleIds !== "all" && !accessibleIds.includes(query.studentId)) {
+            throw new HTTPException(403, { message: "Access denied" });
+        }
+        logs = await db.memorizationLogs.findMany({ studentId: query.studentId });
+    } else {
+        logs = await db.memorizationLogs.findMany({}); // Heavy fetch
     }
 
-    if (query.type) {
-      conditions.push(eq(memorizationLogs.type, query.type));
+    // Filter
+    if (accessibleIds !== "all") {
+        logs = logs.filter((l: any) => accessibleIds.includes(l.studentId));
     }
 
-    if (query.surahId) {
-      conditions.push(eq(memorizationLogs.surahId, query.surahId));
-    }
+    if (query.type) logs = logs.filter((l: any) => l.type === query.type);
+    if (query.surahId) logs = logs.filter((l: any) => l.surahId == query.surahId);
+    if (query.startDate) logs = logs.filter((l: any) => l.sessionDate >= query.startDate!);
+    if (query.endDate) logs = logs.filter((l: any) => l.sessionDate <= query.endDate!);
 
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(memorizationLogs)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    const total = countResult[0]?.count || 0;
+    const total = logs.length;
     const offset = (query.page - 1) * query.limit;
 
-    const data = await db.query.memorizationLogs.findMany({
-      where: conditions.length > 0 ? and(...conditions) : undefined,
-      limit: query.limit,
-      offset,
-      orderBy: (logs, { desc }) => [
-        desc(logs.sessionDate),
-        desc(logs.createdAt),
-      ],
+    // Sort descending by date
+    logs.sort((a: any, b: any) => {
+        const dateDiff = b.sessionDate.localeCompare(a.sessionDate);
+        if (dateDiff !== 0) return dateDiff;
+        return (b.createdAt || "").localeCompare(a.createdAt || "");
     });
+
+    const paginatedLogs = logs.slice(offset, offset + query.limit);
 
     return c.json({
       success: true,
-      data,
+      data: paginatedLogs,
       pagination: {
         page: query.page,
         limit: query.limit,
@@ -270,9 +219,7 @@ tahfidz.get("/logs/:id", async (c) => {
   const { id } = c.req.param();
   const auth = c.get("auth");
 
-  const log = await db.query.memorizationLogs.findFirst({
-    where: eq(memorizationLogs.id, id),
-  });
+  const log = await db.memorizationLogs.findFirst({ id: id });
 
   if (!log) {
     throw new HTTPException(404, { message: "Memorization log not found" });
@@ -283,10 +230,14 @@ tahfidz.get("/logs/:id", async (c) => {
     throw new HTTPException(403, { message: "Access denied" });
   }
 
-  // Get associated assessment if exists
-  const assessment = await db.query.assessments.findFirst({
-    where: eq(assessments.logId, id),
-  });
+  // Get associated assessment
+  // GASClient doesn't support complex joins. We need to check all assessments for this logId.
+  // Assuming assessments table can be filtered by logId if we had index support.
+  // Without it, fetching all assessments is heavy.
+  // Optimization: If assessment ID is stored in log? No.
+  // We'll fetch all assessments and find.
+  const allAssessments = await db.assessments.findMany({});
+  const assessment = allAssessments.find((a: any) => a.logId === id) || null;
 
   return c.json({
     success: true,
@@ -308,24 +259,13 @@ tahfidz.put(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.memorizationLogs.findFirst({
-      where: eq(memorizationLogs.id, id),
-    });
+    const existing = await db.memorizationLogs.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Memorization log not found" });
     }
 
-    const [updated] = await db
-      .update(memorizationLogs)
-      .set({
-        ...body,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(memorizationLogs.id, id))
-      .returning();
-
-    await syncService.queueSync("memorization_logs", id, "update", body);
+    const updated = await db.memorizationLogs.update(id, body);
 
     return c.json({
       success: true,
@@ -346,24 +286,13 @@ tahfidz.patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.memorizationLogs.findFirst({
-      where: eq(memorizationLogs.id, id),
-    });
+    const existing = await db.memorizationLogs.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Memorization log not found" });
     }
 
-    const [updated] = await db
-      .update(memorizationLogs)
-      .set({
-        ...body,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(memorizationLogs.id, id))
-      .returning();
-
-    await syncService.queueSync("memorization_logs", id, "update", body);
+    const updated = await db.memorizationLogs.update(id, body);
 
     return c.json({
       success: true,
@@ -379,19 +308,20 @@ tahfidz.patch(
 tahfidz.delete("/logs/:id", teacherOrAdmin, async (c) => {
   const { id } = c.req.param();
 
-  const existing = await db.query.memorizationLogs.findFirst({
-    where: eq(memorizationLogs.id, id),
-  });
+  const existing = await db.memorizationLogs.findFirst({ id: id });
 
   if (!existing) {
     throw new HTTPException(404, { message: "Memorization log not found" });
   }
 
   // Delete associated assessments first
-  await db.delete(assessments).where(eq(assessments.logId, id));
-  await db.delete(memorizationLogs).where(eq(memorizationLogs.id, id));
+  const allAssessments = await db.assessments.findMany({});
+  const assessment = allAssessments.find((a: any) => a.logId === id);
+  if (assessment) {
+      await db.assessments.delete(assessment.id);
+  }
 
-  await syncService.queueSync("memorization_logs", id, "delete", { id });
+  await db.memorizationLogs.delete(id);
 
   return c.json({
     success: true,
@@ -413,9 +343,7 @@ tahfidz.post(
     const { user } = c.get("auth");
 
     // Check if log exists
-    const log = await db.query.memorizationLogs.findFirst({
-      where: eq(memorizationLogs.id, body.logId),
-    });
+    const log = await db.memorizationLogs.findFirst({ id: body.logId });
 
     if (!log) {
       throw new HTTPException(404, { message: "Memorization log not found" });
@@ -424,9 +352,7 @@ tahfidz.post(
     const totalScore =
       (body.tajwidScore + body.fashohahScore + body.fluencyScore) / 3;
 
-    const [assessment] = await db
-      .insert(assessments)
-      .values({
+    const assessment = await db.assessments.create({
         id: body.id || uuidv4(),
         logId: body.logId,
         tajwidScore: body.tajwidScore,
@@ -436,15 +362,7 @@ tahfidz.post(
         grade: calculateGrade(totalScore),
         notes: body.notes || null,
         assessedBy: body.assessedBy || user.id,
-      })
-      .returning();
-
-    await syncService.queueSync(
-      "assessments",
-      assessment.id,
-      "create",
-      assessment,
-    );
+    });
 
     return c.json(
       {
@@ -466,9 +384,7 @@ tahfidz.put(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.assessments.findFirst({
-      where: eq(assessments.id, id),
-    });
+    const existing = await db.assessments.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Assessment not found" });
@@ -477,21 +393,14 @@ tahfidz.put(
     const totalScore =
       (body.tajwidScore + body.fashohahScore + body.fluencyScore) / 3;
 
-    const [updated] = await db
-      .update(assessments)
-      .set({
+    const updated = await db.assessments.update(id, {
         tajwidScore: body.tajwidScore,
         fashohahScore: body.fashohahScore,
         fluencyScore: body.fluencyScore,
         totalScore,
         grade: calculateGrade(totalScore),
         notes: body.notes,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(assessments.id, id))
-      .returning();
-
-    await syncService.queueSync("assessments", id, "update", body);
+    });
 
     return c.json({
       success: true,
@@ -510,32 +419,22 @@ tahfidz.patch(
     const { id } = c.req.param();
     const body = c.req.valid("json");
 
-    const existing = await db.query.assessments.findFirst({
-      where: eq(assessments.id, id),
-    });
+    const existing = await db.assessments.findFirst({ id: id });
 
     if (!existing) {
       throw new HTTPException(404, { message: "Assessment not found" });
     }
 
-    // Recalculate total if any score changed
     const tajwid = body.tajwidScore ?? existing.tajwidScore;
     const fashohah = body.fashohahScore ?? existing.fashohahScore;
     const fluency = body.fluencyScore ?? existing.fluencyScore;
     const totalScore = (tajwid + fashohah + fluency) / 3;
 
-    const [updated] = await db
-      .update(assessments)
-      .set({
+    const updated = await db.assessments.update(id, {
         ...body,
         totalScore,
         grade: calculateGrade(totalScore),
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(assessments.id, id))
-      .returning();
-
-    await syncService.queueSync("assessments", id, "update", body);
+    });
 
     return c.json({
       success: true,
@@ -549,16 +448,13 @@ tahfidz.patch(
 tahfidz.delete("/assessments/:id", teacherOrAdmin, async (c) => {
   const { id } = c.req.param();
 
-  const existing = await db.query.assessments.findFirst({
-    where: eq(assessments.id, id),
-  });
+  const existing = await db.assessments.findFirst({ id: id });
 
   if (!existing) {
     throw new HTTPException(404, { message: "Assessment not found" });
   }
 
-  await db.delete(assessments).where(eq(assessments.id, id));
-  await syncService.queueSync("assessments", id, "delete", { id });
+  await db.assessments.delete(id);
 
   return c.json({
     success: true,
@@ -570,9 +466,10 @@ tahfidz.delete("/assessments/:id", teacherOrAdmin, async (c) => {
 // GET /sync/tahfidz/surahs - Get all surahs (reference data)
 // ============================================
 tahfidz.get("/surahs", async (c) => {
-  const allSurahs = await db.query.surahs.findMany({
-    orderBy: (surahs, { asc }) => [asc(surahs.id)],
-  });
+  const allSurahs = await db.dataQuran.findMany({});
+
+  // Sort by id
+  allSurahs.sort((a: any, b: any) => Number(a.id) - Number(b.id));
 
   return c.json({
     success: true,

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import bcrypt from "bcryptjs";
-import { eq, and, sql } from "drizzle-orm";
-import { db, users, otpCodes } from "../db/index.js";
+import { db } from "../lib/gasClient.js";
 import {
   loginSchema,
   registerSchema,
@@ -15,6 +14,7 @@ import {
 import { sendOtpEmail } from "../services/brevo.js";
 import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
+import { User } from "../types/index.js";
 
 const auth = new Hono();
 
@@ -25,8 +25,8 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
   const body = c.req.valid("json");
 
   // Check if email already exists
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.email, body.email),
+  const existingUser = await db.users.findFirst({
+    email: body.email,
   });
 
   if (existingUser) {
@@ -37,16 +37,15 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
   const hashedPassword = await bcrypt.hash(body.password, 12);
 
   // Create user
-  const [newUser] = await db
-    .insert(users)
-    .values({
+  const newUser = await db.users.create({
       ...body,
       password: hashedPassword,
-    })
-    .returning();
+      isActive: true, // Default to true
+      role: body.role || "student"
+  });
 
   // Generate token
-  const token = generateToken(newUser);
+  const token = generateToken(newUser as User);
 
   return c.json(
     {
@@ -76,8 +75,8 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
   // Find user
-  const user = await db.query.users.findFirst({
-    where: eq(users.email, email),
+  const user = await db.users.findFirst({
+    email: email,
   });
 
   if (!user) {
@@ -85,7 +84,9 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
   }
 
   // Check if user is active
-  if (!user.isActive) {
+  // Handle string/boolean mismatch from GAS
+  const isActive = user.isActive === true || user.isActive === "true" || user.isActive === "TRUE";
+  if (!isActive) {
     throw new HTTPException(403, { message: "Account is deactivated" });
   }
 
@@ -101,7 +102,7 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
 
   // Save OTP to DB
-  await db.insert(otpCodes).values({
+  await db.otpCodes.create({
     userId: user.id,
     code: otp,
     expiresAt: expiresAt.getTime(), // Store as timestamp
@@ -137,8 +138,8 @@ auth.post("/verify-otp", async (c) => {
   }
 
   // Find user
-  const user = await db.query.users.findFirst({
-    where: eq(users.email, email),
+  const user = await db.users.findFirst({
+    email: email,
   });
 
   if (!user) {
@@ -147,10 +148,16 @@ auth.post("/verify-otp", async (c) => {
 
   // Verify OTP
   // Get latest active OTP for user
-  const existingOtp = await db.query.otpCodes.findFirst({
-    where: and(eq(otpCodes.userId, user.id), eq(otpCodes.code, code)),
-    orderBy: (otpCodes, { desc }) => [desc(otpCodes.createdAt)],
+  const otps = await db.otpCodes.findMany({
+    userId: user.id,
+    code: code,
   });
+
+  // Sort in memory (descending by createdAt/numeric ID usually correlates)
+  // Warning: creation order might not be guaranteed if id is uuid unless we parse dates
+  const existingOtp = otps.sort((a: any, b: any) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  })[0];
 
   if (!existingOtp) {
     throw new HTTPException(400, { message: "Invalid OTP" });
@@ -162,10 +169,10 @@ auth.post("/verify-otp", async (c) => {
   }
 
   // Generate Request Token (JWT)
-  const token = generateToken(user);
+  const token = generateToken(user as User);
 
   // Cleanup used OTP (optional, or mark as used)
-  await db.delete(otpCodes).where(eq(otpCodes.id, existingOtp.id));
+  await db.otpCodes.delete(existingOtp.id);
 
   return c.json({
     success: true,
@@ -206,13 +213,16 @@ auth.get("/me", authMiddleware, async (c) => {
 // ============================================
 // PUT /auth/me - Update current user profile
 // ============================================
+// ============================================
+// PUT /auth/me - Update current user profile
+// ============================================
 auth.put(
   "/me",
   authMiddleware,
   zValidator("json", updateUserSchema),
   async (c) => {
     const { user } = c.get("auth");
-    const body = c.req.valid("json");
+    const body: any = c.req.valid("json");
 
     // Don't allow role change through profile update (except for admin)
     if (body.role && user.role !== "admin") {
@@ -226,8 +236,8 @@ auth.put(
 
     // Check email uniqueness if changing
     if (body.email && body.email !== user.email) {
-      const existingUser = await db.query.users.findFirst({
-        where: eq(users.email, body.email),
+      const existingUser = await db.users.findFirst({
+        email: body.email,
       });
 
       if (existingUser) {
@@ -235,14 +245,10 @@ auth.put(
       }
     }
 
-    const [updatedUser] = await db
-      .update(users)
-      .set({
+    const updatedUser = await db.users.update(user.id, {
         ...body,
         updatedAt: new Date().toISOString(),
-      })
-      .where(eq(users.id, user.id))
-      .returning();
+    });
 
     return c.json({
       success: true,
@@ -264,6 +270,10 @@ auth.put(
 // ============================================
 
 // GET /auth/users - Get all users (admin only)
+// ============================================
+// ADMIN ROUTES
+// ============================================
+
 // GET /auth/users - Get all users with pagination and filtering (admin only)
 auth.get("/users", authMiddleware, adminOnly, async (c) => {
   const query = c.req.query();
@@ -275,49 +285,49 @@ auth.get("/users", authMiddleware, adminOnly, async (c) => {
   const isActive = query.is_active;
   const search = query.q;
 
-  // Build conditions
-  const conditions = [];
+  // 1. Fetch All (filtered by role if possible to reduce load, but our simple client supports simple object match)
+  // For searching and complex filtering, we fetch all first.
+  let allUsers: any[] = await db.users.findMany({});
 
+  // 2. Filter in Memory
   if (role) {
-    conditions.push(eq(users.role, role as any));
+      allUsers = allUsers.filter(u => u.role === role);
   }
 
   if (isActive !== undefined) {
     const isTrue = isActive === "true" || isActive === "1" || isActive === "on";
-    conditions.push(eq(users.isActive, isTrue));
+    // Handle potential string boolean from Sheets
+    allUsers = allUsers.filter(u => {
+        const uActive = u.isActive === true || u.isActive === "true" || u.isActive === "TRUE";
+        return uActive === isTrue;
+    });
   }
 
   if (search) {
     const searchLower = search.toLowerCase();
-    conditions.push(
-      sql`(lower(${users.name}) LIKE ${`%${searchLower}%`} OR lower(${users.email}) LIKE ${`%${searchLower}%`})`,
+    allUsers = allUsers.filter(u =>
+        (u.name && u.name.toLowerCase().includes(searchLower)) ||
+        (u.email && u.email.toLowerCase().includes(searchLower))
     );
   }
 
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const total = allUsers.length;
 
-  // Get data
-  const allUsers = await db.query.users.findMany({
-    where: whereClause,
-    columns: {
-      password: false, // Exclude password
-    },
-    limit: limit,
-    offset: offset,
-    orderBy: (users, { desc }) => [desc(users.createdAt)],
+  // Sort by createdAt desc
+  allUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // 3. Paginate
+  const slicedUsers = allUsers.slice(offset, offset + limit);
+
+  // Hide passwords
+  const safeUsers = slicedUsers.map(u => {
+      const { password, ...rest } = u;
+      return rest;
   });
-
-  // Get total count
-  const totalResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(users)
-    .where(whereClause);
-
-  const total = totalResult[0]?.count || 0;
 
   return c.json({
     success: true,
-    data: allUsers,
+    data: safeUsers,
     pagination: {
       page,
       limit,
@@ -331,20 +341,19 @@ auth.get("/users", authMiddleware, adminOnly, async (c) => {
 auth.get("/users/:id", authMiddleware, adminOnly, async (c) => {
   const { id } = c.req.param();
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, id),
-    columns: {
-      password: false,
-    },
+  const user = await db.users.findFirst({
+    id: id
   });
 
   if (!user) {
     throw new HTTPException(404, { message: "User not found" });
   }
 
+  const { password, ...safeUser } = user;
+
   return c.json({
     success: true,
-    data: user,
+    data: safeUser,
   });
 });
 
@@ -356,11 +365,11 @@ auth.put(
   zValidator("json", updateUserSchema),
   async (c) => {
     const { id } = c.req.param();
-    const body = c.req.valid("json");
+    const body: any = c.req.valid("json");
 
     // Check if user exists
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.id, id),
+    const existingUser = await db.users.findFirst({
+      id: id
     });
 
     if (!existingUser) {
@@ -374,8 +383,8 @@ auth.put(
 
     // Check email uniqueness
     if (body.email && body.email !== existingUser.email) {
-      const emailUser = await db.query.users.findFirst({
-        where: eq(users.email, body.email),
+      const emailUser = await db.users.findFirst({
+        email: body.email
       });
 
       if (emailUser) {
@@ -383,14 +392,10 @@ auth.put(
       }
     }
 
-    const [updatedUser] = await db
-      .update(users)
-      .set({
+    const updatedUser = await db.users.update(id, {
         ...body,
         updatedAt: new Date().toISOString(),
-      })
-      .where(eq(users.id, id))
-      .returning();
+    });
 
     return c.json({
       success: true,
@@ -414,11 +419,11 @@ auth.patch(
   zValidator("json", updateUserSchema),
   async (c) => {
     const { id } = c.req.param();
-    const body = c.req.valid("json");
+    const body: any = c.req.valid("json");
 
     // Check if user exists
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.id, id),
+    const existingUser = await db.users.findFirst({
+      id: id
     });
 
     if (!existingUser) {
@@ -430,14 +435,10 @@ auth.patch(
       body.password = await bcrypt.hash(body.password, 12);
     }
 
-    const [updatedUser] = await db
-      .update(users)
-      .set({
+    const updatedUser = await db.users.update(id, {
         ...body,
         updatedAt: new Date().toISOString(),
-      })
-      .where(eq(users.id, id))
-      .returning();
+    });
 
     return c.json({
       success: true,
@@ -463,15 +464,15 @@ auth.delete("/users/:id", authMiddleware, adminOnly, async (c) => {
   }
 
   // Check if user exists
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.id, id),
+  const existingUser = await db.users.findFirst({
+    id: id
   });
 
   if (!existingUser) {
     throw new HTTPException(404, { message: "User not found" });
   }
 
-  await db.delete(users).where(eq(users.id, id));
+  await db.users.delete(id);
 
   return c.json({
     success: true,

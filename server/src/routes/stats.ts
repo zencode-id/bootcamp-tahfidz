@@ -1,22 +1,12 @@
 import { Hono } from "hono";
-import { eq, and, gte, lte, sql, inArray, count } from "drizzle-orm";
-import {
-  db,
-  attendance,
-  memorizationLogs,
-  assessments,
-  surahs,
-  users,
-} from "../db/index.js";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { db } from "../lib/gasClient.js";
 import {
   authMiddleware,
   canAccessStudent,
-  getAccessibleStudentIds,
 } from "../middleware/auth.js";
-import { paginationSchema, dateRangeSchema } from "../validators/index.js";
-import { zValidator } from "@hono/zod-validator";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 
 const stats = new Hono();
 
@@ -42,27 +32,23 @@ stats.get("/progress/:studentId", async (c) => {
   }
 
   // Verify student exists
-  const student = await db.query.users.findFirst({
-    where: eq(users.id, studentId),
-  });
+  const student = await db.users.findFirst({ id: studentId });
 
   if (!student) {
     throw new HTTPException(404, { message: "Student not found" });
   }
 
   // Get all memorization logs for this student (Ziyadah only for progress)
-  const ziyadahLogs = await db.query.memorizationLogs.findMany({
-    where: and(
-      eq(memorizationLogs.studentId, studentId),
-      eq(memorizationLogs.type, "ziyadah"),
-    ),
-  });
+  const allLogs = await db.memorizationLogs.findMany({ studentId: studentId });
+  const ziyadahLogs = allLogs.filter((l: any) => l.type === "ziyadah");
 
-  // Calculate total ayahs memorized (unique ayahs)
+  // Calculate total ayahs memorized (unique ayahs logic roughly)
+  // Simplified by just summing ranges, assuming non-overlapping or handling overlaps in future.
+  // Original code used a Set of "surah:ayah" strings. We can do that.
   const memorizedAyahs = new Set<string>();
 
   for (const log of ziyadahLogs) {
-    for (let ayah = log.startAyah; ayah <= log.endAyah; ayah++) {
+    for (let ayah = Number(log.startAyah); ayah <= Number(log.endAyah); ayah++) {
       memorizedAyahs.add(`${log.surahId}:${ayah}`);
     }
   }
@@ -71,60 +57,35 @@ stats.get("/progress/:studentId", async (c) => {
   const progressPercentage = (totalMemorized / TOTAL_QURAN_AYAHS) * 100;
 
   // Calculate Juz completion
-  const juzProgress: {
-    juz: number;
-    percentage: number;
-    ayahsMemorized: number;
-    totalAyahs: number;
-  }[] = [];
+  const juzProgress: any[] = [];
 
   // Simplified Juz ayah counts (approximate)
   const juzAyahCounts: { [key: number]: number } = {
-    1: 148,
-    2: 111,
-    3: 126,
-    4: 131,
-    5: 124,
-    6: 110,
-    7: 149,
-    8: 142,
-    9: 159,
-    10: 127,
-    11: 151,
-    12: 170,
-    13: 154,
-    14: 227,
-    15: 185,
-    16: 269,
-    17: 190,
-    18: 202,
-    19: 339,
-    20: 171,
-    21: 178,
-    22: 169,
-    23: 357,
-    24: 175,
-    25: 246,
-    26: 195,
-    27: 399,
-    28: 137,
-    29: 431,
-    30: 564,
+    1: 148, 2: 111, 3: 126, 4: 131, 5: 124, 6: 110, 7: 149, 8: 142, 9: 159, 10: 127,
+    11: 151, 12: 170, 13: 154, 14: 227, 15: 185, 16: 269, 17: 190, 18: 202, 19: 339, 20: 171,
+    21: 178, 22: 169, 23: 357, 24: 175, 25: 246, 26: 195, 27: 399, 28: 137, 29: 431, 30: 564,
   };
 
-  // Get memorized count per juz (simplified - would need proper juz-ayah mapping)
+  // Get memorized count per juz
   for (let juz = 1; juz <= 30; juz++) {
     const totalAyahsInJuz = juzAyahCounts[juz] || 200;
-    // This is simplified - in production, you'd have proper juz-ayah mapping
-    const ayahsMemorized = Math.min(
-      ziyadahLogs
-        .filter((log) => {
-          const surahJuz = log.surahId <= 2 ? 1 : Math.ceil(log.surahId / 4);
+
+    // In-memory calculation
+    // Note: Log SurahId -> Juz mapping is approximate in original code too.
+    const relevantLogs = ziyadahLogs.filter((log: any) => {
+          const sId = Number(log.surahId);
+          // Very rough estimation: Surahs 1-2 Juz 1, etc.
+          // Original code: const surahJuz = log.surahId <= 2 ? 1 : Math.ceil(log.surahId / 4);
+          const surahJuz = sId <= 2 ? 1 : Math.ceil(sId / 4);
           return Math.abs(surahJuz - juz) <= 1;
-        })
-        .reduce((sum, log) => sum + (log.endAyah - log.startAyah + 1), 0) / 3,
-      totalAyahsInJuz,
-    );
+    });
+
+    // Summing ranges (simplified)
+    const ayahsMemorizedRaw = relevantLogs.reduce((sum: number, log: any) => sum + (Number(log.endAyah) - Number(log.startAyah) + 1), 0) / 3;
+    // The division by 3 in original code is a rough heuristic because logs might span juz boundaries or be counted in multiple buckets?
+    // We'll keep original heuristic.
+
+    const ayahsMemorized = Math.min(ayahsMemorizedRaw, totalAyahsInJuz);
 
     juzProgress.push({
       juz,
@@ -135,11 +96,7 @@ stats.get("/progress/:studentId", async (c) => {
   }
 
   // Get assessment scores
-  const studentLogs = await db.query.memorizationLogs.findMany({
-    where: eq(memorizationLogs.studentId, studentId),
-  });
-
-  const logIds = studentLogs.map((log) => log.id);
+  const logIds = allLogs.map((log: any) => log.id);
 
   let avgScores = {
     tajwid: 0,
@@ -150,23 +107,29 @@ stats.get("/progress/:studentId", async (c) => {
   };
 
   if (logIds.length > 0) {
-    const studentAssessments = await db.query.assessments.findMany({
-      where: inArray(assessments.logId, logIds),
-    });
+      // Performance: Fetching all assessments to filter by logIds might be heavy.
+      // But we can fetch assessments for current student logs if we had a link.
+      // Assessments usually have logId but not studentId directly?
+      // Our type definition in index.ts for Assessments?
+      // Let's check GASClient or Types.
+      // In Reports.ts, we did `db.assessments.findMany({})`.
+      // We'll assume assessments are linked to logs.
+      const allAssessments = await db.assessments.findMany({});
+      const studentAssessments = allAssessments.filter((a: any) => logIds.includes(a.logId));
 
     if (studentAssessments.length > 0) {
       avgScores = {
         tajwid:
-          studentAssessments.reduce((sum, a) => sum + a.tajwidScore, 0) /
+          studentAssessments.reduce((sum: number, a: any) => sum + Number(a.tajwidScore||0), 0) /
           studentAssessments.length,
         fashohah:
-          studentAssessments.reduce((sum, a) => sum + a.fashohahScore, 0) /
+          studentAssessments.reduce((sum: number, a: any) => sum + Number(a.fashohahScore||0), 0) /
           studentAssessments.length,
         fluency:
-          studentAssessments.reduce((sum, a) => sum + a.fluencyScore, 0) /
+          studentAssessments.reduce((sum: number, a: any) => sum + Number(a.fluencyScore||0), 0) /
           studentAssessments.length,
         total:
-          studentAssessments.reduce((sum, a) => sum + a.totalScore, 0) /
+          studentAssessments.reduce((sum: number, a: any) => sum + Number(a.totalScore||0), 0) /
           studentAssessments.length,
         count: studentAssessments.length,
       };
@@ -174,27 +137,24 @@ stats.get("/progress/:studentId", async (c) => {
   }
 
   // Get recent activity
-  const recentLogs = await db.query.memorizationLogs.findMany({
-    where: eq(memorizationLogs.studentId, studentId),
-    orderBy: (logs, { desc }) => [desc(logs.sessionDate)],
-    limit: 10,
-  });
+  const recentLogs = [...allLogs].sort((a: any, b: any) => b.sessionDate.localeCompare(a.sessionDate)).slice(0, 10);
 
   // Get surah progress
-  const surahProgress = await db
-    .select({
-      surahId: memorizationLogs.surahId,
-      totalAyahs: sql<number>`SUM(${memorizationLogs.endAyah} - ${memorizationLogs.startAyah} + 1)`,
-      sessions: sql<number>`COUNT(*)`,
-    })
-    .from(memorizationLogs)
-    .where(
-      and(
-        eq(memorizationLogs.studentId, studentId),
-        eq(memorizationLogs.type, "ziyadah"),
-      ),
-    )
-    .groupBy(memorizationLogs.surahId);
+  const surahProgressMap = new Map<number, { surahId: number, totalAyahs: number, sessions: number }>();
+
+  ziyadahLogs.forEach((log: any) => {
+      const sId = Number(log.surahId);
+      const ayahs = Number(log.endAyah) - Number(log.startAyah) + 1;
+
+      if (!surahProgressMap.has(sId)) {
+        surahProgressMap.set(sId, { surahId: sId, totalAyahs: 0, sessions: 0 });
+      }
+      const entry = surahProgressMap.get(sId)!;
+      entry.totalAyahs += ayahs;
+      entry.sessions += 1;
+  });
+
+  const surahProgress = Array.from(surahProgressMap.values());
 
   return c.json({
     success: true,
@@ -248,9 +208,7 @@ stats.get(
     }
 
     // Verify student exists
-    const student = await db.query.users.findFirst({
-      where: eq(users.id, studentId),
-    });
+    const student = await db.users.findFirst({ id: studentId });
 
     if (!student) {
       throw new HTTPException(404, { message: "Student not found" });
@@ -266,28 +224,16 @@ stats.get(
       : `${year}-12-31`;
 
     // Get attendance records
-    const records = await db.query.attendance.findMany({
-      where: and(
-        eq(attendance.studentId, studentId),
-        gte(attendance.date, startDate),
-        lte(attendance.date, endDate),
-      ),
-      orderBy: (att, { asc }) => [asc(att.date)],
-    });
+    // Filter in-memory for dates
+    const allRecords = await db.attendance.findMany({ studentId: studentId });
+    const records = allRecords.filter((r: any) => r.date >= startDate && r.date <= endDate);
+
+    // Sort
+    records.sort((a: any, b: any) => a.date.localeCompare(b.date));
 
     // Build heatmap data
-    interface HeatmapDay {
-      date: string;
-      sessions: {
-        type: string;
-        status: string;
-      }[];
-      presentCount: number;
-      absentCount: number;
-      totalSessions: number;
-    }
-
-    const heatmapData: { [date: string]: HeatmapDay } = {};
+    // ... logic same as original ...
+    const heatmapData: any = {};
 
     for (const record of records) {
       if (!heatmapData[record.date]) {
@@ -315,67 +261,36 @@ stats.get(
     }
 
     // Calculate monthly summaries
-    const monthlySummary: {
-      [month: string]: {
-        present: number;
-        absent: number;
-        sick: number;
-        leave: number;
-        late: number;
-        total: number;
-        attendanceRate: number;
-      };
-    } = {};
+    const monthlySummary: any = {};
 
     for (const record of records) {
       const month = record.date.substring(0, 7); // YYYY-MM
-
       if (!monthlySummary[month]) {
-        monthlySummary[month] = {
-          present: 0,
-          absent: 0,
-          sick: 0,
-          leave: 0,
-          late: 0,
-          total: 0,
-          attendanceRate: 0,
-        };
+        monthlySummary[month] = { present: 0, absent: 0, sick: 0, leave: 0, late: 0, total: 0, attendanceRate: 0 };
       }
-
-      monthlySummary[month][
-        record.status as keyof (typeof monthlySummary)[typeof month]
-      ]++;
+      monthlySummary[month][record.status]++;
       monthlySummary[month].total++;
     }
 
-    // Calculate attendance rates
+    // Rates
     for (const month of Object.keys(monthlySummary)) {
       const { present, late, total } = monthlySummary[month];
-      monthlySummary[month].attendanceRate =
-        total > 0 ? Math.round(((present + late) / total) * 10000) / 100 : 0;
+      monthlySummary[month].attendanceRate = total > 0 ? Math.round(((present + late) / total) * 10000) / 100 : 0;
     }
 
     // Session type breakdown
-    const sessionTypeBreakdown = await db
-      .select({
-        sessionType: attendance.sessionType,
-        status: attendance.status,
-        count: sql<number>`COUNT(*)`,
-      })
-      .from(attendance)
-      .where(
-        and(
-          eq(attendance.studentId, studentId),
-          gte(attendance.date, startDate),
-          lte(attendance.date, endDate),
-        ),
-      )
-      .groupBy(attendance.sessionType, attendance.status);
+    const sessionTypeStats: any = {};
+    records.forEach((r: any) => {
+        const key = `${r.sessionType}-${r.status}`;
+        if (!sessionTypeStats[key]) sessionTypeStats[key] = { sessionType: r.sessionType, status: r.status, count: 0 };
+        sessionTypeStats[key].count++;
+    });
+    const sessionTypeBreakdown = Object.values(sessionTypeStats);
 
     // Overall stats
     const totalRecords = records.length;
     const presentCount = records.filter(
-      (r) => r.status === "present" || r.status === "late",
+      (r: any) => r.status === "present" || r.status === "late",
     ).length;
     const overallAttendanceRate =
       totalRecords > 0
@@ -385,23 +300,15 @@ stats.get(
     return c.json({
       success: true,
       data: {
-        student: {
-          id: student.id,
-          name: student.name,
-        },
-        period: {
-          year,
-          month: query.month || null,
-          startDate,
-          endDate,
-        },
+        student: { id: student.id, name: student.name },
+        period: { year, month: query.month || null, startDate, endDate },
         overall: {
           totalSessions: totalRecords,
           presentCount,
-          absentCount: records.filter((r) => r.status === "absent").length,
-          sickCount: records.filter((r) => r.status === "sick").length,
-          leaveCount: records.filter((r) => r.status === "leave").length,
-          lateCount: records.filter((r) => r.status === "late").length,
+          absentCount: records.filter((r: any) => r.status === "absent").length,
+          sickCount: records.filter((r: any) => r.status === "sick").length,
+          leaveCount: records.filter((r: any) => r.status === "leave").length,
+          lateCount: records.filter((r: any) => r.status === "late").length,
           attendanceRate: overallAttendanceRate,
         },
         heatmap: Object.values(heatmapData),
@@ -419,47 +326,44 @@ stats.get("/class/:classId", async (c) => {
   const { classId } = c.req.param();
   const auth = c.get("auth");
 
-  // Only teachers and admins can view class stats
   if (auth.user.role !== "admin" && auth.user.role !== "teacher") {
     throw new HTTPException(403, { message: "Access denied" });
   }
 
-  // Get class attendance stats
   const today = new Date().toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  const attendanceStats = await db
-    .select({
-      status: attendance.status,
-      count: sql<number>`COUNT(*)`,
-    })
-    .from(attendance)
-    .where(
-      and(eq(attendance.classId, classId), gte(attendance.date, thirtyDaysAgo)),
-    )
-    .groupBy(attendance.status);
+  // Get class attendance stats
+  // Limit 1000 records? Or filter by classId on server (if param available in attendance table)
+  // Attendance table usually has classId?
+  // Let's check types.ts
+  const allAtt = await db.attendance.findMany({ classId: classId });
+  const recentAtt = allAtt.filter((a: any) => a.date >= thirtyDaysAgo);
+
+  const attendanceStatsMap: any = {};
+  recentAtt.forEach((a: any) => {
+      if(!attendanceStatsMap[a.status]) attendanceStatsMap[a.status] = { status: a.status, count: 0 };
+      attendanceStatsMap[a.status].count++;
+  });
+  const attendanceStats = Object.values(attendanceStatsMap);
 
   // Get memorization activity
-  const memorizationStats = await db
-    .select({
-      type: memorizationLogs.type,
-      totalAyahs: sql<number>`SUM(${memorizationLogs.endAyah} - ${memorizationLogs.startAyah} + 1)`,
-      sessions: sql<number>`COUNT(*)`,
-    })
-    .from(memorizationLogs)
-    .where(eq(memorizationLogs.classId, classId))
-    .groupBy(memorizationLogs.type);
+  const allMem = await db.memorizationLogs.findMany({ classId: classId });
+
+  const memorizationStatsMap: any = {};
+  allMem.forEach((l: any) => {
+      if(!memorizationStatsMap[l.type]) memorizationStatsMap[l.type] = { type: l.type, totalAyahs: 0, sessions: 0 };
+      const ayahs = Number(l.endAyah) - Number(l.startAyah) + 1;
+      memorizationStatsMap[l.type].totalAyahs += ayahs;
+      memorizationStatsMap[l.type].sessions++;
+  });
+  const memorizationStats = Object.values(memorizationStatsMap);
 
   return c.json({
     success: true,
     data: {
       classId,
-      period: {
-        from: thirtyDaysAgo,
-        to: today,
-      },
+      period: { from: thirtyDaysAgo, to: today },
       attendance: attendanceStats,
       memorization: memorizationStats,
     },
@@ -478,97 +382,96 @@ stats.get("/leaderboard", zValidator("query", leaderboardSchema), async (c) => {
   const query = c.req.valid("query");
   const auth = c.get("auth");
 
-  // Only teachers and admins can view leaderboard
   if (auth.user.role !== "admin" && auth.user.role !== "teacher") {
     throw new HTTPException(403, { message: "Access denied" });
   }
 
-  let leaderboard: { studentId: string; studentName: string; value: number }[] =
-    [];
+  let leaderboard: { studentId: string; studentName: string; value: number }[] = [];
+
+  // Fetch all students to map names later
+  const students = await db.users.findMany({});
+  const studentMap = new Map();
+  students.forEach((s: any) => studentMap.set(s.id, s.name));
 
   if (query.type === "ayahs") {
-    // Top students by ayahs memorized
-    const result = await db
-      .select({
-        studentId: memorizationLogs.studentId,
-        totalAyahs: sql<number>`SUM(${memorizationLogs.endAyah} - ${memorizationLogs.startAyah} + 1)`,
-      })
-      .from(memorizationLogs)
-      .where(eq(memorizationLogs.type, "ziyadah"))
-      .groupBy(memorizationLogs.studentId)
-      .orderBy(
-        sql`SUM(${memorizationLogs.endAyah} - ${memorizationLogs.startAyah} + 1) DESC`,
-      )
-      .limit(query.limit);
+    // Fetch all Ziyadah logs
+    const allLogs = await db.memorizationLogs.findMany({});
+    const ziyadah = allLogs.filter((l: any) => l.type === "ziyadah");
 
-    for (const row of result) {
-      const student = await db.query.users.findFirst({
-        where: eq(users.id, row.studentId),
-        columns: { name: true },
-      });
-      leaderboard.push({
-        studentId: row.studentId,
-        studentName: student?.name || "Unknown",
-        value: row.totalAyahs,
-      });
-    }
+    // Group by student
+    const studentCounts: any = {};
+    ziyadah.forEach((l: any) => {
+        if(!studentCounts[l.studentId]) studentCounts[l.studentId] = 0;
+        studentCounts[l.studentId] += (Number(l.endAyah) - Number(l.startAyah) + 1);
+    });
+
+    const sortedIds = Object.keys(studentCounts).sort((a,b) => studentCounts[b] - studentCounts[a]);
+
+    sortedIds.slice(0, query.limit).forEach(id => {
+        leaderboard.push({
+            studentId: id,
+            studentName: studentMap.get(id) || "Unknown",
+            value: studentCounts[id]
+        });
+    });
+
   } else if (query.type === "score") {
-    // Top students by average score
-    const result = await db
-      .select({
-        studentId: memorizationLogs.studentId,
-        avgScore: sql<number>`AVG(${assessments.totalScore})`,
-      })
-      .from(assessments)
-      .innerJoin(memorizationLogs, eq(assessments.logId, memorizationLogs.id))
-      .groupBy(memorizationLogs.studentId)
-      .orderBy(sql`AVG(${assessments.totalScore}) DESC`)
-      .limit(query.limit);
+    // Avg assessment score
+    const assessments = await db.assessments.findMany({});
+    const memLogs = await db.memorizationLogs.findMany({});
+    const logMap = new Map();
+    memLogs.forEach((l: any) => logMap.set(l.id, l.studentId));
 
-    for (const row of result) {
-      const student = await db.query.users.findFirst({
-        where: eq(users.id, row.studentId),
-        columns: { name: true },
-      });
-      leaderboard.push({
-        studentId: row.studentId,
-        studentName: student?.name || "Unknown",
-        value: Math.round(row.avgScore * 100) / 100,
-      });
-    }
+    const studentScores: any = {};
+    assessments.forEach((a: any) => {
+        const sId = logMap.get(a.logId);
+        if(sId) {
+            if(!studentScores[sId]) studentScores[sId] = { sum: 0, count: 0 };
+            studentScores[sId].sum += Number(a.totalScore);
+            studentScores[sId].count++;
+        }
+    });
+
+    const result = Object.keys(studentScores).map(id => ({
+        id,
+        avg: studentScores[id].sum / studentScores[id].count
+    })).sort((a,b) => b.avg - a.avg);
+
+    result.slice(0, query.limit).forEach(r => {
+        leaderboard.push({
+            studentId: r.id,
+            studentName: studentMap.get(r.id) || "Unknown",
+            value: Math.round(r.avg * 100) / 100
+        });
+    });
+
   } else {
-    // Top students by attendance rate
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    // Attendance rate
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const attendance = await db.attendance.findMany({}); // Filter by date?
+    // GASClient might not support date filter on FindMany efficiently if payload size big.
 
-    const result = await db
-      .select({
-        studentId: attendance.studentId,
-        presentCount: sql<number>`SUM(CASE WHEN ${attendance.status} IN ('present', 'late') THEN 1 ELSE 0 END)`,
-        totalCount: sql<number>`COUNT(*)`,
-      })
-      .from(attendance)
-      .where(gte(attendance.date, thirtyDaysAgo))
-      .groupBy(attendance.studentId)
-      .orderBy(
-        sql`SUM(CASE WHEN ${attendance.status} IN ('present', 'late') THEN 1 ELSE 0 END) * 1.0 / COUNT(*) DESC`,
-      )
-      .limit(query.limit);
+    const recent = attendance.filter((a: any) => a.date >= thirtyDaysAgo);
 
-    for (const row of result) {
-      const student = await db.query.users.findFirst({
-        where: eq(users.id, row.studentId),
-        columns: { name: true },
-      });
-      const rate =
-        row.totalCount > 0 ? (row.presentCount / row.totalCount) * 100 : 0;
-      leaderboard.push({
-        studentId: row.studentId,
-        studentName: student?.name || "Unknown",
-        value: Math.round(rate * 100) / 100,
-      });
-    }
+    const studentAtt: any = {};
+    recent.forEach((a: any) => {
+        if(!studentAtt[a.studentId]) studentAtt[a.studentId] = { present: 0, total: 0 };
+        studentAtt[a.studentId].total++;
+        if(a.status === 'present' || a.status === 'late') studentAtt[a.studentId].present++;
+    });
+
+    const result = Object.keys(studentAtt).map(id => ({
+        id,
+        rate: studentAtt[id].total > 0 ? (studentAtt[id].present / studentAtt[id].total) * 100 : 0
+    })).sort((a,b) => b.rate - a.rate);
+
+    result.slice(0, query.limit).forEach(r => {
+        leaderboard.push({
+            studentId: r.id,
+            studentName: studentMap.get(r.id) || "Unknown",
+            value: Math.round(r.rate * 100) / 100
+        });
+    });
   }
 
   return c.json({

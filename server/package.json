@@ -8,11 +8,6 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/db/seed.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -28,9 +23,7 @@
     "@hono/node-server": "^1.19.9",
     "@hono/zod-validator": "^0.7.6",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.6.2",
-    "dotenv": "^17.2.3",
-    "drizzle-orm": "^0.45.1",
+    "dotenv": "^16.4.5",
     "hono": "^4.11.7",
     "jsonwebtoken": "^9.0.3",
     "sib-api-v3-sdk": "^8.5.0",
@@ -39,11 +32,9 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.1.0",
+    "@types/node": "^25.2.0",
     "@types/uuid": "^10.0.0",
-    "drizzle-kit": "^0.31.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

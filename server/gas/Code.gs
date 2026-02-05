@@ -37,6 +37,9 @@ const SHEETS = {
   REPORTS: "Reports",
   DATA_QURAN: "Data_Quran",
   SYNC_LOG: "SyncLog",
+  SYNC_LOG: "SyncLog",
+  OTP_CODES: "OtpCodes",
+  CLASS_MEMBERS: "ClassMembers",
 };
 
 // Column headers for each sheet
@@ -196,6 +199,22 @@ const HEADERS = {
     "revelationType",
     "juz",
   ],
+  CLASS_MEMBERS: [
+    "id",
+    "classId",
+    "studentId",
+    "joinedAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  OTP_CODES: [
+    "id",
+    "userId",
+    "code",
+    "expiresAt",
+    "createdAt",
+    "updatedAt"
+  ],
 };
 
 /**
@@ -260,7 +279,7 @@ function doPost(e) {
  */
 function handleRead(payload) {
   const { table, query, limit } = payload;
-  
+
   try {
     let sheetName;
     let headers;
@@ -273,7 +292,12 @@ function handleRead(payload) {
       case "assessments": sheetName = SHEETS.ASSESSMENTS; headers = HEADERS.ASSESSMENTS; break;
       case "exams": sheetName = SHEETS.EXAMS; headers = HEADERS.EXAMS; break;
       case "exam_results": sheetName = SHEETS.EXAM_RESULTS; headers = HEADERS.EXAM_RESULTS; break;
+      case "exam_results": sheetName = SHEETS.EXAM_RESULTS; headers = HEADERS.EXAM_RESULTS; break;
       case "reports": sheetName = SHEETS.REPORTS; headers = HEADERS.REPORTS; break;
+      case "otp_codes": sheetName = SHEETS.OTP_CODES; headers = HEADERS.OTP_CODES; break;
+      case "otp_codes": sheetName = SHEETS.OTP_CODES; headers = HEADERS.OTP_CODES; break;
+      case "class_members": sheetName = SHEETS.CLASS_MEMBERS; headers = HEADERS.CLASS_MEMBERS; break;
+      case "data_quran": sheetName = SHEETS.DATA_QURAN; headers = HEADERS.DATA_QURAN; break;
       default: throw new Error(`Unknown table: ${table}`);
     }
 
@@ -285,14 +309,14 @@ function handleRead(payload) {
     const data = sheet.getDataRange().getValues();
     const rows = data.slice(1); // Skip header
     const results = [];
-    
+
     // Map array to object
     for (const row of rows) {
       const item = {};
       headers.forEach((h, i) => {
         item[h] = row[i];
       });
-      
+
       // Perform simple filtering
       let match = true;
       if (query) {
@@ -304,11 +328,11 @@ function handleRead(payload) {
              }
         }
       }
-      
+
       if (match) {
         results.push(item);
       }
-      
+
       if (limit && results.length >= limit) break;
     }
 
@@ -374,6 +398,18 @@ function processItem(item) {
     case "reports":
       sheetName = SHEETS.REPORTS;
       headers = HEADERS.REPORTS;
+      break;
+    case "otp_codes":
+      sheetName = SHEETS.OTP_CODES;
+      headers = HEADERS.OTP_CODES;
+      break;
+    case "class_members":
+      sheetName = SHEETS.CLASS_MEMBERS;
+      headers = HEADERS.CLASS_MEMBERS;
+      break;
+    case "data_quran":
+      sheetName = SHEETS.DATA_QURAN;
+      headers = HEADERS.DATA_QURAN;
       break;
     default:
       throw new Error(`Unknown table: ${table}`);
@@ -487,7 +523,9 @@ function onEdit(e) {
     SHEETS.ASSESSMENTS,
     SHEETS.EXAMS,
     SHEETS.EXAM_RESULTS,
+    SHEETS.EXAM_RESULTS,
     SHEETS.REPORTS,
+    SHEETS.CLASS_MEMBERS,
   ];
 
   if (!syncableSheets.includes(sheetName)) {
@@ -553,6 +591,9 @@ function onEdit(e) {
       break;
     case SHEETS.REPORTS:
       tableName = "reports";
+      break;
+    case SHEETS.CLASS_MEMBERS:
+      tableName = "class_members";
       break;
   }
 
@@ -788,6 +829,16 @@ function setupSheets() {
       name: SHEETS.SYNC_LOG,
       headers: ["Timestamp", "Action", "Source", "Details"],
       description: "Log sinkronisasi",
+    },
+    {
+      name: SHEETS.OTP_CODES,
+      headers: HEADERS.OTP_CODES,
+      description: "Kode OTP untuk login",
+    },
+    {
+      name: SHEETS.CLASS_MEMBERS,
+      headers: HEADERS.CLASS_MEMBERS,
+      description: "Data anggota kelas (Siswa - Kelas)",
     },
   ];
 

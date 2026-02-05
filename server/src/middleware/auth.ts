@@ -1,9 +1,8 @@
 import { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import jwt from "jsonwebtoken";
-import { db, users } from "../db/index.js";
-import { eq } from "drizzle-orm";
-import type { UserRole, User } from "../db/schema.js";
+import { db } from "../lib/gasClient.js"; // Use GAS Client
+import { User, UserRole } from "../types/index.js";
 
 // ============================================
 // TYPES
@@ -69,13 +68,17 @@ export async function authMiddleware(c: Context, next: Next) {
   const token = authHeader.substring(7);
   const payload = verifyToken(token);
 
-  // Fetch user from database to ensure they still exist and are active
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, payload.userId),
+  // Fetch user from Google Sheets
+  const user = await db.users.findFirst({
+     id: payload.userId
   });
 
   if (!user) {
     throw new HTTPException(401, { message: "User not found" });
+  }
+
+  if (typeof user.isActive === 'string') {
+      user.isActive = user.isActive === 'TRUE' || user.isActive === 'true';
   }
 
   if (!user.isActive) {
@@ -168,11 +171,11 @@ export function requireOwnership(config: OwnershipConfig) {
     // For parents: they can access their children's data
     if (userRole === "parent") {
       // Check if the resourceId is one of their children
-      const children = await db.query.users.findMany({
-        where: eq(users.parentId, auth.user.id),
+      const children = await db.users.findMany({
+          parentId: auth.user.id
       });
 
-      const childIds = children.map((child) => child.id);
+      const childIds = children.map((child: User) => child.id);
 
       if (!childIds.includes(resourceId) && resourceId !== auth.user.id) {
         throw new HTTPException(403, {
@@ -205,10 +208,10 @@ export async function getAccessibleStudentIds(
 
   // Parents can access their children's data
   if (userRole === "parent") {
-    const children = await db.query.users.findMany({
-      where: eq(users.parentId, auth.user.id),
-    });
-    return children.map((child) => child.id);
+      const children = await db.users.findMany({
+          parentId: auth.user.id
+      });
+    return children.map((child: User) => child.id);
   }
 
   return [];
@@ -229,3 +232,4 @@ export async function canAccessStudent(
 
   return accessibleIds.includes(studentId);
 }
+
