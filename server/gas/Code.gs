@@ -334,8 +334,8 @@ function handleRead(payload) {
     const headerRow = data[0];
     const headerMap = {};
     headerRow.forEach((col, index) => {
-      // Clean header name (trim, etc) if needed, but assuming strict match for now
-      if (col) headerMap[String(col).trim()] = index;
+      // Normalize to lowercase for case-insensitive matching
+      if (col) headerMap[String(col).trim().toLowerCase()] = index;
     });
 
     const rows = data.slice(1); // Skip header
@@ -351,7 +351,8 @@ function handleRead(payload) {
       const expectedHeaders = getHeadersForTable(table);
 
       expectedHeaders.forEach((h) => {
-        const colIndex = headerMap[h];
+        // Look up by lowercase
+        const colIndex = headerMap[h.toLowerCase()];
         if (colIndex !== undefined) {
           item[h] = row[colIndex];
         } else {
@@ -547,7 +548,7 @@ function insertRow(sheet, headers, data) {
     .getValues()[0];
   const headerMap = {};
   sheetHeaders.forEach((col, index) => {
-    if (col) headerMap[String(col).trim()] = index;
+    if (col) headerMap[String(col).trim().toLowerCase()] = index;
   });
 
   // Create row with initialized empty strings
@@ -555,8 +556,8 @@ function insertRow(sheet, headers, data) {
 
   // Fill in data based on header map
   headers.forEach((h) => {
-    if (headerMap[h] !== undefined && data[h] !== undefined) {
-      row[headerMap[h]] = data[h];
+    if (headerMap[h.toLowerCase()] !== undefined && data[h] !== undefined) {
+      row[headerMap[h.toLowerCase()]] = data[h];
     }
   });
 
@@ -582,7 +583,7 @@ function updateRow(sheet, headers, data) {
   let idColIndex = -1;
 
   headerRow.forEach((col, index) => {
-    const colName = String(col).trim();
+    const colName = String(col).trim().toLowerCase();
     if (colName) {
       headerMap[colName] = index;
       if (colName === "id") idColIndex = index;
@@ -602,8 +603,8 @@ function updateRow(sheet, headers, data) {
       // Update fields
       headers.forEach((h) => {
         // Only update if field exists in data AND column exists in sheet
-        if (data[h] !== undefined && headerMap[h] !== undefined) {
-          newRow[headerMap[h]] = data[h];
+        if (data[h] !== undefined && headerMap[h.toLowerCase()] !== undefined) {
+          newRow[headerMap[h.toLowerCase()]] = data[h];
         }
       });
 
