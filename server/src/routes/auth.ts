@@ -111,12 +111,6 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     throw new HTTPException(403, { message: `Account is deactivated (isActive=${user.isActive}, type=${typeof user.isActive})` });
   }
 
-  // Verify password
-  if (!user.password) {
-      console.error("DEBUG: Password missing for user", user);
-      throw new HTTPException(500, { message: `Server Error: Password field missing from database. User keys: ${Object.keys(user).join(", ")}` });
-  }
-
   const isValidPassword = await bcrypt.compare(password, user.password);
 
   if (!isValidPassword) {
