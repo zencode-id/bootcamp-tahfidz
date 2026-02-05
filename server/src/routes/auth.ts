@@ -83,9 +83,11 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     throw new HTTPException(401, { message: "Invalid email or password" });
   }
 
+  console.log("DEBUG user data:", JSON.stringify(user, null, 2));
+
   // Check if user is active
   // Handle string/boolean mismatch from GAS
-  const isActive = user.isActive === true || user.isActive === "true" || user.isActive === "TRUE";
+  const isActive = user.isActive === true || user.isActive === "true" || user.isActive === "TRUE" || user.isActive === "ON" || user.isActive === "Active" || user.isActive === 1 || user.isActive === "1";
   if (!isActive) {
     throw new HTTPException(403, { message: "Account is deactivated" });
   }
