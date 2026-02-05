@@ -58,13 +58,21 @@ export class GASClient {
                 body: JSON.stringify(payload),
             });
 
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(`GAS Error ${response.status}: ${text}`);
+            const text = await response.text();
+
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (e) {
+                console.error("GAS RAW RESPONSE:", text);
+                throw new Error(`Failed to parse GAS response: ${text.substring(0, 100)}...`);
             }
 
-            const json = await response.json();
-             return json;
+            if (!response.ok) {
+                throw new Error(`GAS Error ${response.status}: ${JSON.stringify(json)}`);
+            }
+
+            return json;
 
         } catch (error: any) {
             console.error("GAS Fetch Error:", error.message);
