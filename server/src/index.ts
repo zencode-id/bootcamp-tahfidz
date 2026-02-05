@@ -163,9 +163,12 @@ console.log(`
 ╚═══════════════════════════════════════════════════════╝
 `);
 
-serve({
-  fetch: app.fetch,
-  port,
-});
+// Only start local server if not running on Vercel
+if (!process.env.VERCEL) {
+  serve({
+    fetch: app.fetch,
+    port,
+  });
+}
 
 export default app;
