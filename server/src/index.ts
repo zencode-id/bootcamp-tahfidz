@@ -31,7 +31,24 @@ const app = new Hono();
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3000", "http://localhost:5173", "*"],
+    origin: (origin) => {
+      // Allow requests with no origin (mobile apps, curl, etc)
+      if (!origin) return origin;
+
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://bootcamp-tahfidz-client.vercel.app",
+        "https://bootcamp-tahfidz.vercel.app",
+      ];
+
+      // Allow Vercel preview deployments
+      if (origin.endsWith(".vercel.app") || allowedOrigins.includes(origin)) {
+        return origin;
+      }
+
+      return null;
+    },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     credentials: true,
