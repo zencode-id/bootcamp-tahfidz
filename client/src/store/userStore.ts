@@ -34,11 +34,18 @@ export const useUserStore = create<UserState>((set, get) => ({
   fetchUsers: async () => {
     set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      // In a real app with backend proxy, we would add Authorization header
-      // For now, our backend might rely on GAS functionality or just simple proxy
 
-      const response = await fetch(`${API_URL}/users`, {
+      // Ensure we get the latest token from the store
+      const token = useAuthStore.getState().token;
+
+      console.log(`[userStore] Fetching users with token: ${token ? 'PRESENT' : 'MISSING'}`);
+
+      if (!token) {
+        set({ error: "No authentication token found" });
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/auth/users`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
@@ -62,7 +69,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const token = useAuthStore.getState().token;
-      const response = await fetch(`${API_URL}/users`, {
+      const response = await fetch(`${API_URL}/auth/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,7 +100,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true });
     try {
       const token = useAuthStore.getState().token;
-      const response = await fetch(`${API_URL}/users/${id}`, {
+      const response = await fetch(`${API_URL}/auth/users/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -122,7 +129,7 @@ export const useUserStore = create<UserState>((set, get) => ({
      set({ isLoading: true });
      try {
        const token = useAuthStore.getState().token;
-       const response = await fetch(`${API_URL}/users/${id}`, {
+       const response = await fetch(`${API_URL}/auth/users/${id}`, {
          method: "DELETE",
          headers: {
             "Authorization": `Bearer ${token}`

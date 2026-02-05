@@ -128,6 +128,9 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     expiresAt: expiresAt.getTime(), // Store as timestamp
   });
 
+  // DEV: Log OTP to console
+  console.log(`[DEV] OTP for ${user.email}: ${otp}`);
+
   // Send OTP via Brevo
   try {
     await sendOtpEmail(user.email, otp, user.name);
