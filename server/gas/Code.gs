@@ -276,60 +276,41 @@ function handleRead(payload) {
 
   try {
     let sheetName;
-    let headers;
 
+    // Determine sheet name based on table
     switch (table) {
       case "users":
         sheetName = SHEETS.USERS;
-        headers = HEADERS.USERS;
         break;
       case "classes":
         sheetName = SHEETS.CLASSES;
-        headers = HEADERS.CLASSES;
         break;
       case "attendance":
         sheetName = SHEETS.ATTENDANCE;
-        headers = HEADERS.ATTENDANCE;
         break;
       case "memorization_logs":
         sheetName = SHEETS.MEMORIZATION_LOGS;
-        headers = HEADERS.MEMORIZATION_LOGS;
         break;
       case "assessments":
         sheetName = SHEETS.ASSESSMENTS;
-        headers = HEADERS.ASSESSMENTS;
         break;
       case "exams":
         sheetName = SHEETS.EXAMS;
-        headers = HEADERS.EXAMS;
         break;
       case "exam_results":
         sheetName = SHEETS.EXAM_RESULTS;
-        headers = HEADERS.EXAM_RESULTS;
-        break;
-      case "exam_results":
-        sheetName = SHEETS.EXAM_RESULTS;
-        headers = HEADERS.EXAM_RESULTS;
         break;
       case "reports":
         sheetName = SHEETS.REPORTS;
-        headers = HEADERS.REPORTS;
         break;
       case "otp_codes":
         sheetName = SHEETS.OTP_CODES;
-        headers = HEADERS.OTP_CODES;
-        break;
-      case "otp_codes":
-        sheetName = SHEETS.OTP_CODES;
-        headers = HEADERS.OTP_CODES;
         break;
       case "class_members":
         sheetName = SHEETS.CLASS_MEMBERS;
-        headers = HEADERS.CLASS_MEMBERS;
         break;
       case "data_quran":
         sheetName = SHEETS.DATA_QURAN;
-        headers = HEADERS.DATA_QURAN;
         break;
       default:
         throw new Error(`Unknown table: ${table}`);
@@ -344,26 +325,54 @@ function handleRead(payload) {
       });
     }
 
+    // Get all data including headers
     const data = sheet.getDataRange().getValues();
+    if (data.length < 1)
+      return createResponse(200, { success: true, data: [] });
+
+    // Extract headers and map to indices
+    const headerRow = data[0];
+    const headerMap = {};
+    headerRow.forEach((col, index) => {
+      // Clean header name (trim, etc) if needed, but assuming strict match for now
+      if (col) headerMap[String(col).trim()] = index;
+    });
+
     const rows = data.slice(1); // Skip header
     const results = [];
 
-    // Map array to object
+    // Map array to object using dynamic headers
     for (const row of rows) {
       const item = {};
-      headers.forEach((h, i) => {
-        item[h] = row[i];
+
+      // We iterate over the EXPECTED headers for this table (defined in HEADERS global)
+      // If the column exists in the sheet, we use it. If not, undef.
+      // This allows sheet to have extra columns or missing columns without breaking hard
+      const expectedHeaders = getHeadersForTable(table);
+
+      expectedHeaders.forEach((h) => {
+        const colIndex = headerMap[h];
+        if (colIndex !== undefined) {
+          item[h] = row[colIndex];
+        } else {
+          item[h] = null; // or undefined
+        }
       });
+
+      // Also include any other columns found in the sheet but not in expected headers?
+      // For now, let's stick to expected headers for safety/consistency
 
       // Perform simple filtering
       let match = true;
       if (query) {
         for (const [key, value] of Object.entries(query)) {
-          // Strict equality for now, can be expanded
           if (item[key] != value) {
-            // Use loose equality for string/number mismatch
-            match = false;
-            break;
+            // Loose equality check for number/string mismatch common in Sheets
+            // e.g. "1" == 1
+            if (String(item[key]) !== String(value)) {
+              match = false;
+              break;
+            }
           }
         }
       }
@@ -381,6 +390,38 @@ function handleRead(payload) {
     });
   } catch (error) {
     return createResponse(500, { success: false, message: error.message });
+  }
+}
+
+/**
+ * Helper to get expected headers for a table name
+ */
+function getHeadersForTable(table) {
+  switch (table) {
+    case "users":
+      return HEADERS.USERS;
+    case "classes":
+      return HEADERS.CLASSES;
+    case "attendance":
+      return HEADERS.ATTENDANCE;
+    case "memorization_logs":
+      return HEADERS.MEMORIZATION_LOGS;
+    case "assessments":
+      return HEADERS.ASSESSMENTS;
+    case "exams":
+      return HEADERS.EXAMS;
+    case "exam_results":
+      return HEADERS.EXAM_RESULTS;
+    case "reports":
+      return HEADERS.REPORTS;
+    case "otp_codes":
+      return HEADERS.OTP_CODES;
+    case "class_members":
+      return HEADERS.CLASS_MEMBERS;
+    case "data_quran":
+      return HEADERS.DATA_QURAN;
+    default:
+      return [];
   }
 }
 
@@ -500,7 +541,28 @@ function getOrCreateSheet(name, headers) {
  * Insert a new row
  */
 function insertRow(sheet, headers, data) {
-  const row = headers.map((h) => data[h] || "");
+  // Get current headers from sheet to ensure correct order
+  const sheetHeaders = sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0];
+  const headerMap = {};
+  sheetHeaders.forEach((col, index) => {
+    if (col) headerMap[String(col).trim()] = index;
+  });
+
+  // Create row with initialized empty strings
+  const row = new Array(sheetHeaders.length).fill("");
+
+  // Fill in data based on header map
+  headers.forEach((h) => {
+    if (headerMap[h] !== undefined && data[h] !== undefined) {
+      row[headerMap[h]] = data[h];
+    }
+  });
+
+  // If there are extra fields in data that map to columns in sheet but not in "headers" definition?
+  // We stick to 'headers' def for safety.
+
   sheet.appendRow(row);
 }
 
@@ -512,15 +574,40 @@ function updateRow(sheet, headers, data) {
   const dataRange = sheet.getDataRange();
   const values = dataRange.getValues();
 
-  // Find the ID column (should be first)
-  const idColIndex = headers.indexOf("id");
+  if (values.length < 1) return; // Empty sheet
 
+  // Map headers
+  const headerRow = values[0];
+  const headerMap = {};
+  let idColIndex = -1;
+
+  headerRow.forEach((col, index) => {
+    const colName = String(col).trim();
+    if (colName) {
+      headerMap[colName] = index;
+      if (colName === "id") idColIndex = index;
+    }
+  });
+
+  if (idColIndex === -1) {
+    throw new Error("ID column not found in sheet");
+  }
+
+  // Find row with matching ID
   for (let i = 1; i < values.length; i++) {
     if (values[i][idColIndex] === id) {
-      const newRow = headers.map((h) =>
-        data[h] !== undefined ? data[h] : values[i][headers.indexOf(h)],
-      );
-      sheet.getRange(i + 1, 1, 1, headers.length).setValues([newRow]);
+      const currentRow = values[i];
+      const newRow = [...currentRow]; // Copy existing row
+
+      // Update fields
+      headers.forEach((h) => {
+        // Only update if field exists in data AND column exists in sheet
+        if (data[h] !== undefined && headerMap[h] !== undefined) {
+          newRow[headerMap[h]] = data[h];
+        }
+      });
+
+      sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
       return;
     }
   }

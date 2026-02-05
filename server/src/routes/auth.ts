@@ -84,12 +84,31 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
   }
 
   console.log("DEBUG user data:", JSON.stringify(user, null, 2));
+  console.log("DEBUG isActive raw value:", user.isActive, "type:", typeof user.isActive);
 
   // Check if user is active
-  // Handle string/boolean mismatch from GAS
-  const isActive = user.isActive === true || user.isActive === "true" || user.isActive === "TRUE" || user.isActive === "ON" || user.isActive === "Active" || user.isActive === 1 || user.isActive === "1";
+  // Handle string/boolean mismatch from GAS - be very permissive
+  const isActiveValue = user.isActive;
+  const isActive =
+    isActiveValue === true ||
+    isActiveValue === "true" ||
+    isActiveValue === "TRUE" ||
+    isActiveValue === "True" ||
+    isActiveValue === "ON" ||
+    isActiveValue === "on" ||
+    isActiveValue === "Active" ||
+    isActiveValue === "active" ||
+    isActiveValue === 1 ||
+    isActiveValue === "1" ||
+    isActiveValue === "yes" ||
+    isActiveValue === "YES" ||
+    // Also check for checkbox that returns boolean
+    (typeof isActiveValue === 'boolean' && isActiveValue);
+
+  console.log("DEBUG isActive computed:", isActive);
+
   if (!isActive) {
-    throw new HTTPException(403, { message: "Account is deactivated" });
+    throw new HTTPException(403, { message: `Account is deactivated (isActive=${user.isActive}, type=${typeof user.isActive})` });
   }
 
   // Verify password
