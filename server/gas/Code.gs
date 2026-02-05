@@ -48,6 +48,7 @@ const HEADERS = {
     "id",
     "name",
     "email",
+    "password",
     "role",
     "parentId",
     "phone",
@@ -205,16 +206,9 @@ const HEADERS = {
     "studentId",
     "joinedAt",
     "createdAt",
-    "updatedAt"
+    "updatedAt",
   ],
-  OTP_CODES: [
-    "id",
-    "userId",
-    "code",
-    "expiresAt",
-    "createdAt",
-    "updatedAt"
-  ],
+  OTP_CODES: ["id", "userId", "code", "expiresAt", "createdAt", "updatedAt"],
 };
 
 /**
@@ -285,25 +279,69 @@ function handleRead(payload) {
     let headers;
 
     switch (table) {
-      case "users": sheetName = SHEETS.USERS; headers = HEADERS.USERS; break;
-      case "classes": sheetName = SHEETS.CLASSES; headers = HEADERS.CLASSES; break;
-      case "attendance": sheetName = SHEETS.ATTENDANCE; headers = HEADERS.ATTENDANCE; break;
-      case "memorization_logs": sheetName = SHEETS.MEMORIZATION_LOGS; headers = HEADERS.MEMORIZATION_LOGS; break;
-      case "assessments": sheetName = SHEETS.ASSESSMENTS; headers = HEADERS.ASSESSMENTS; break;
-      case "exams": sheetName = SHEETS.EXAMS; headers = HEADERS.EXAMS; break;
-      case "exam_results": sheetName = SHEETS.EXAM_RESULTS; headers = HEADERS.EXAM_RESULTS; break;
-      case "exam_results": sheetName = SHEETS.EXAM_RESULTS; headers = HEADERS.EXAM_RESULTS; break;
-      case "reports": sheetName = SHEETS.REPORTS; headers = HEADERS.REPORTS; break;
-      case "otp_codes": sheetName = SHEETS.OTP_CODES; headers = HEADERS.OTP_CODES; break;
-      case "otp_codes": sheetName = SHEETS.OTP_CODES; headers = HEADERS.OTP_CODES; break;
-      case "class_members": sheetName = SHEETS.CLASS_MEMBERS; headers = HEADERS.CLASS_MEMBERS; break;
-      case "data_quran": sheetName = SHEETS.DATA_QURAN; headers = HEADERS.DATA_QURAN; break;
-      default: throw new Error(`Unknown table: ${table}`);
+      case "users":
+        sheetName = SHEETS.USERS;
+        headers = HEADERS.USERS;
+        break;
+      case "classes":
+        sheetName = SHEETS.CLASSES;
+        headers = HEADERS.CLASSES;
+        break;
+      case "attendance":
+        sheetName = SHEETS.ATTENDANCE;
+        headers = HEADERS.ATTENDANCE;
+        break;
+      case "memorization_logs":
+        sheetName = SHEETS.MEMORIZATION_LOGS;
+        headers = HEADERS.MEMORIZATION_LOGS;
+        break;
+      case "assessments":
+        sheetName = SHEETS.ASSESSMENTS;
+        headers = HEADERS.ASSESSMENTS;
+        break;
+      case "exams":
+        sheetName = SHEETS.EXAMS;
+        headers = HEADERS.EXAMS;
+        break;
+      case "exam_results":
+        sheetName = SHEETS.EXAM_RESULTS;
+        headers = HEADERS.EXAM_RESULTS;
+        break;
+      case "exam_results":
+        sheetName = SHEETS.EXAM_RESULTS;
+        headers = HEADERS.EXAM_RESULTS;
+        break;
+      case "reports":
+        sheetName = SHEETS.REPORTS;
+        headers = HEADERS.REPORTS;
+        break;
+      case "otp_codes":
+        sheetName = SHEETS.OTP_CODES;
+        headers = HEADERS.OTP_CODES;
+        break;
+      case "otp_codes":
+        sheetName = SHEETS.OTP_CODES;
+        headers = HEADERS.OTP_CODES;
+        break;
+      case "class_members":
+        sheetName = SHEETS.CLASS_MEMBERS;
+        headers = HEADERS.CLASS_MEMBERS;
+        break;
+      case "data_quran":
+        sheetName = SHEETS.DATA_QURAN;
+        headers = HEADERS.DATA_QURAN;
+        break;
+      default:
+        throw new Error(`Unknown table: ${table}`);
     }
 
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    const sheet =
+      SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) {
-        return createResponse(404, { success: false, message: "Sheet not found" });
+      return createResponse(404, {
+        success: false,
+        message: "Sheet not found",
+      });
     }
 
     const data = sheet.getDataRange().getValues();
@@ -322,10 +360,11 @@ function handleRead(payload) {
       if (query) {
         for (const [key, value] of Object.entries(query)) {
           // Strict equality for now, can be expanded
-             if (item[key] != value) { // Use loose equality for string/number mismatch
-                match = false;
-                break;
-             }
+          if (item[key] != value) {
+            // Use loose equality for string/number mismatch
+            match = false;
+            break;
+          }
         }
       }
 
@@ -338,11 +377,10 @@ function handleRead(payload) {
 
     return createResponse(200, {
       success: true,
-      data: results
+      data: results,
     });
-
   } catch (error) {
-     return createResponse(500, { success: false, message: error.message });
+    return createResponse(500, { success: false, message: error.message });
   }
 }
 
