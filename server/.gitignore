@@ -7,3 +7,7 @@ data/
 *.db-wal
 *.db-shm
 .DS_Store
+
+# Secrets
+server/credentials.json
+credentials.json

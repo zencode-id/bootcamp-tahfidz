@@ -15,7 +15,7 @@ import statsRoutes from "./routes/stats.js";
 import classRoutes from "./routes/classes.js";
 import examRoutes from "./routes/exams.js";
 import reportRoutes from "./routes/reports.js";
-import { db } from "./lib/gasClient.js";
+import { db } from "./lib/sheetsClient.js";
 
 // Import DB to initialize on startup
 // import "./db/index.js"; // Removed for GAS migration

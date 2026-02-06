@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import bcrypt from "bcryptjs";
-import { db } from "../lib/gasClient.js";
+import { db } from "../lib/sheetsClient.js";
 import {
   loginSchema,
   registerSchema,
@@ -74,17 +74,20 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
 auth.post("/login", zValidator("json", loginSchema), async (c) => {
   const { email, password } = c.req.valid("json");
 
+  console.log(`[LOGIN] Start login for ${email}`);
+  const startTotal = Date.now();
+
   // Find user
+  console.time("db_find_user");
   const user = await db.users.findFirst({
     email: email,
   });
+  console.timeEnd("db_find_user");
+  console.log(`[LOGIN] User found: ${!!user}, Time: ${Date.now() - startTotal}ms`);
 
   if (!user) {
     throw new HTTPException(401, { message: "Invalid email or password" });
   }
-
-  console.log("DEBUG user data:", JSON.stringify(user, null, 2));
-  console.log("DEBUG isActive raw value:", user.isActive, "type:", typeof user.isActive);
 
   // Check if user is active
   // Handle string/boolean mismatch from GAS - be very permissive
@@ -105,13 +108,15 @@ auth.post("/login", zValidator("json", loginSchema), async (c) => {
     // Also check for checkbox that returns boolean
     (typeof isActiveValue === 'boolean' && isActiveValue);
 
-  console.log("DEBUG isActive computed:", isActive);
-
   if (!isActive) {
-    throw new HTTPException(403, { message: `Account is deactivated (isActive=${user.isActive}, type=${typeof user.isActive})` });
+    throw new HTTPException(403, { message: `Account is deactivated` });
   }
 
+  console.time("bcrypt_compare");
+  const startBcrypt = Date.now();
   const isValidPassword = await bcrypt.compare(password, user.password);
+  console.timeEnd("bcrypt_compare");
+  console.log(`[LOGIN] Password valid: ${isValidPassword}, Bcrypt time: ${Date.now() - startBcrypt}ms`);
 
   if (!isValidPassword) {
     throw new HTTPException(401, { message: "Invalid email or password" });
