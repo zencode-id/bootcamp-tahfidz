@@ -76,6 +76,8 @@ const Login: React.FC = () => {
             />
             <input
               type="email"
+              name="email"
+              id="email"
               placeholder="Email Address"
               className="input-field"
               style={{ paddingLeft: "2.5rem" }}
@@ -97,6 +99,8 @@ const Login: React.FC = () => {
             />
             <input
               type="password"
+              name="password"
+              id="password"
               placeholder="Password"
               className="input-field"
               style={{ paddingLeft: "2.5rem" }}
