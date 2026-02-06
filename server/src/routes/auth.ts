@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import bcrypt from "bcryptjs";
-import { db } from "../lib/sheetsClient.js";
+import { db } from "../lib/gasClient.js";
 import {
   loginSchema,
   registerSchema,

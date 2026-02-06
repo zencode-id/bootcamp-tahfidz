@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { db } from "../lib/sheetsClient.js";
+import { db } from "../lib/gasClient.js";
 import {
   authMiddleware,
   canAccessStudent,

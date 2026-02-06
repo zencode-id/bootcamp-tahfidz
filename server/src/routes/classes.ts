@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { db } from "../lib/sheetsClient.js";
+import { db } from "../lib/gasClient.js";
 import {
   createClassSchema,
   updateClassSchema,

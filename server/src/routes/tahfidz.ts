@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../lib/sheetsClient.js";
+import { db } from "../lib/gasClient.js";
 import {
   bulkTahfidzSchema,
   memorizationLogItemSchema,

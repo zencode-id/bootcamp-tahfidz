@@ -1,7 +1,7 @@
 import { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import jwt from "jsonwebtoken";
-import { db } from "../lib/sheetsClient.js"; // Use GAS Client
+import { db } from "../lib/gasClient.js"; // Use GAS Client
 import { User, UserRole } from "../types/index.js";
 
 // ============================================
