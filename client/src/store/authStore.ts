@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
-const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+// Detect production environment
+const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
+const API_URL = isProduction
+  ? "https://bootcamp-tahfidz.vercel.app"
+  : (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
 
 interface User {
   id: string;
