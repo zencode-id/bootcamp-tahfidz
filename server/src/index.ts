@@ -15,8 +15,8 @@ import statsRoutes from "./routes/stats.js";
 import classRoutes from "./routes/classes.js";
 import examRoutes from "./routes/exams.js";
 import reportRoutes from "./routes/reports.js";
+import { db } from "./lib/gasClient.js";
 
-// Import DB to initialize on startup
 // Import DB to initialize on startup
 // import "./db/index.js"; // Removed for GAS migration
 
@@ -129,11 +129,32 @@ app.get("/", (c) => {
   });
 });
 
-app.get("/health", (c) => {
+
+
+app.get("/health", async (c) => {
+  let dbStatus = "unknown";
+  let latency = 0;
+  try {
+     const start = Date.now();
+     // Test DB connection with minimal query
+     await db.users.findMany({}, 1);
+     latency = Date.now() - start;
+     dbStatus = "connected";
+  } catch (e: any) {
+     console.error("Health DB check failed:", e);
+     dbStatus = `disconnected: ${e.message}`;
+  }
+
   return c.json({
     success: true,
-    status: "healthy",
+    status: dbStatus === "connected" ? "healthy" : "degraded",
+    db: dbStatus,
+    latency: `${latency}ms`,
     timestamp: new Date().toISOString(),
+    env: {
+       // Safe to show if var exists (true/false)
+       gas_url_configured: !!process.env.GAS_WEBHOOK_URL
+    }
   });
 });
 
