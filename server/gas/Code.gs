@@ -272,6 +272,14 @@ function doPost(e) {
  * Handle Read Requests
  */
 function handleRead(payload) {
+  // Validate payload exists
+  if (!payload) {
+    return createResponse(400, {
+      success: false,
+      message: "Invalid payload: payload is required",
+    });
+  }
+
   const { table, query, limit } = payload;
 
   try {
