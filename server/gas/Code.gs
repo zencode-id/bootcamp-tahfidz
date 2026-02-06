@@ -349,36 +349,35 @@ function handleRead(payload) {
     const rows = data.slice(1); // Skip header
     const results = [];
 
+    // OPTIMIZATION: Get expected headers ONCE, outside the loop
+    const expectedHeaders = getHeadersForTable(table);
+
+    // OPTIMIZATION: Pre-compute query key indices for faster filtering
+    const queryKeys = query ? Object.keys(query) : [];
+    const queryKeyIndices = {};
+    queryKeys.forEach(key => {
+      queryKeyIndices[key] = headerMap[key.toLowerCase()];
+    });
+
     // Map array to object using dynamic headers
-    for (const row of rows) {
-      const item = {};
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
 
-      // We iterate over the EXPECTED headers for this table (defined in HEADERS global)
-      // If the column exists in the sheet, we use it. If not, undef.
-      // This allows sheet to have extra columns or missing columns without breaking hard
-      const expectedHeaders = getHeadersForTable(table);
+      // OPTIMIZATION: Skip completely empty rows early
+      // Check if first column (usually ID) is empty
+      if (!row[0] && !row[1]) continue;
 
-      expectedHeaders.forEach((h) => {
-        // Look up by lowercase
-        const colIndex = headerMap[h.toLowerCase()];
-        if (colIndex !== undefined) {
-          item[h] = row[colIndex];
-        } else {
-          item[h] = null; // or undefined
-        }
-      });
-
-      // Also include any other columns found in the sheet but not in expected headers?
-      // For now, let's stick to expected headers for safety/consistency
-
-      // Perform simple filtering
+      // OPTIMIZATION: Do filtering BEFORE building full object
+      // This avoids building objects for rows that don't match
       let match = true;
-      if (query) {
-        for (const [key, value] of Object.entries(query)) {
-          if (item[key] != value) {
-            // Loose equality check for number/string mismatch common in Sheets
-            // e.g. "1" == 1
-            if (String(item[key]) !== String(value)) {
+      if (query && queryKeys.length > 0) {
+        for (const key of queryKeys) {
+          const colIndex = queryKeyIndices[key];
+          if (colIndex !== undefined) {
+            const cellValue = row[colIndex];
+            const queryValue = query[key];
+            // Compare as strings for consistency
+            if (String(cellValue).toLowerCase() !== String(queryValue).toLowerCase()) {
               match = false;
               break;
             }
@@ -386,9 +385,20 @@ function handleRead(payload) {
         }
       }
 
-      if (match) {
-        results.push(item);
-      }
+      if (!match) continue;
+
+      // Build object only for matching rows
+      const item = {};
+      expectedHeaders.forEach((h) => {
+        const colIndex = headerMap[h.toLowerCase()];
+        if (colIndex !== undefined) {
+          item[h] = row[colIndex];
+        } else {
+          item[h] = null;
+        }
+      });
+
+      results.push(item);
 
       if (limit && results.length >= limit) break;
     }
