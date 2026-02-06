@@ -51,8 +51,9 @@ export class GASClient {
              // Add API Key to payload
             const response = await fetch(GAS_WEBHOOK_URL, {
                 method: "POST",
+                redirect: "follow",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "text/plain",
                     "X-API-Key": GAS_API_KEY || "",
                 },
                 body: JSON.stringify(payload),
