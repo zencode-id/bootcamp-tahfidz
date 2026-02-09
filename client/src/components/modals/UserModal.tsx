@@ -23,6 +23,11 @@ const UserModal: React.FC<UserModalProps> = ({
     password: "",
     role: "student" as "admin" | "teacher" | "parent" | "student",
     isActive: true,
+    phone: "",
+    nip: "",
+    specialization: "",
+    startDate: "",
+    totalHafalan: "",
   });
 
   useEffect(() => {
@@ -33,6 +38,11 @@ const UserModal: React.FC<UserModalProps> = ({
         password: "", // Don't fill password on edit
         role: user.role,
         isActive: user.isActive,
+        phone: user.phone || "",
+        nip: user.nip || "",
+        specialization: user.specialization || "",
+        startDate: user.startDate || "",
+        totalHafalan: user.totalHafalan ? String(user.totalHafalan) : "",
       });
     } else {
       setFormData({
@@ -41,6 +51,11 @@ const UserModal: React.FC<UserModalProps> = ({
         password: "",
         role: "student",
         isActive: true,
+        phone: "",
+        nip: "",
+        specialization: "",
+        startDate: "",
+        totalHafalan: "",
       });
     }
   }, [user, isOpen]);
@@ -156,6 +171,86 @@ const UserModal: React.FC<UserModalProps> = ({
               </select>
             </div>
           </div>
+
+          <div>
+             <label className="block text-xs font-medium text-slate-400 mb-1">
+               Phone Number
+             </label>
+             <input
+               type="text"
+               className="input-field w-full"
+               value={formData.phone}
+               onChange={(e) =>
+                 setFormData({ ...formData, phone: e.target.value })
+               }
+               placeholder="e.g. 08123456789"
+             />
+           </div>
+
+           {(formData.role === "teacher" || formData.role === "admin") && (
+             <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      NIP (Nomor Induk Pegawai)
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      value={formData.nip}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nip: e.target.value })
+                      }
+                      placeholder="e.g. 19800101..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Specialization
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      value={formData.specialization}
+                      onChange={(e) =>
+                        setFormData({ ...formData, specialization: e.target.value })
+                      }
+                      placeholder="e.g. Tahsin, Tajwid"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Start Teaching Date
+                    </label>
+                    <input
+                      type="date"
+                      className="input-field w-full"
+                      value={formData.startDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, startDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Total Juz Memorized
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field w-full"
+                      value={formData.totalHafalan}
+                      onChange={(e) =>
+                        setFormData({ ...formData, totalHafalan: e.target.value })
+                      }
+                      placeholder="e.g. 30"
+                    />
+                  </div>
+                </div>
+             </>
+           )}
 
           <div className="pt-4 flex justify-end gap-3">
             <button

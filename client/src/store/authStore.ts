@@ -2,9 +2,9 @@ import { create } from "zustand";
 
 // Detect production environment
 const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
-const API_URL = isProduction
-  ? "https://bootcamp-tahfidz.vercel.app"
-  : (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+
+// Prioritize VITE_API_URL from environment, fallback to hardcoded production URL or localhost
+const API_URL = (import.meta.env.VITE_API_URL || (isProduction ? "https://tahfidz-bootcamp-api.adzan.workers.dev" : "http://localhost:3000")).replace(/\/$/, "");
 
 interface User {
   id: string;

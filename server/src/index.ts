@@ -15,6 +15,8 @@ import statsRoutes from "./routes/stats.js";
 import classRoutes from "./routes/classes.js";
 import examRoutes from "./routes/exams.js";
 import reportRoutes from "./routes/reports.js";
+import uploadRoutes from "./routes/upload.js";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { db } from "./lib/gasClient.js";
 
 // Import DB to initialize on startup
@@ -169,7 +171,11 @@ app.route("/classes", classRoutes);
 app.route("/exams", examRoutes);
 app.route("/reports", reportRoutes);
 app.route("/reports", reportRoutes);
+app.route("/upload", uploadRoutes);
 // app.route("/webhook", webhookRoutes);
+
+// Serve static files from uploads directory
+app.use("/uploads/*", serveStatic({ root: "./" }));
 
 // ============================================
 // 404 HANDLER

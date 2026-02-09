@@ -3,9 +3,9 @@ import { useAuthStore } from "./authStore";
 
 // Detect production environment
 const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
-const API_URL = isProduction
-  ? "https://bootcamp-tahfidz.vercel.app"
-  : (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+
+// Prioritize VITE_API_URL from environment, fallback to hardcoded production URL or localhost
+const API_URL = (import.meta.env.VITE_API_URL || (isProduction ? "https://tahfidz-bootcamp-api.adzan.workers.dev" : "http://localhost:3000")).replace(/\/$/, "");
 
 export interface UserData {
   id: string;
@@ -16,7 +16,15 @@ export interface UserData {
   phone?: string;
   address?: string;
   parentId?: string; // For students linked to parents
+  photoUrl?: string;
   createdAt?: string;
+  updatedAt?: string;
+
+  // Teacher Profile Data
+  nip?: string;
+  specialization?: string;
+  startDate?: string;
+  totalHafalan?: number;
 }
 
 interface UserState {

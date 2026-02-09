@@ -1,42 +1,28 @@
 {
   "name": "tahfidz-bootcamp-api",
   "version": "1.0.0",
-  "description": "Backend API for School Attendance & Tahfidz Bootcamp Application",
-  "main": "dist/index.js",
+  "description": "API Server for Tahfidz Bootcamp",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
   },
-  "keywords": [
-    "tahfidz",
-    "quran",
-    "attendance",
-    "api",
-    "hono"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@hono/node-server": "^1.19.9",
-    "@hono/zod-validator": "^0.7.6",
-    "bcryptjs": "^3.0.3",
+    "@hono/node-server": "^1.8.1",
+    "@hono/zod-validator": "^0.1.11",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^9.4.3",
     "dotenv": "^16.4.5",
-    "googleapis": "^171.4.0",
-    "hono": "^4.11.7",
-    "jsonwebtoken": "^9.0.3",
-    "sib-api-v3-sdk": "^8.5.0",
-    "uuid": "^13.0.0",
-    "zod": "^3.25.76"
+    "hono": "^4.0.9",
+    "nanoid": "^5.0.6",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.2.0",
-    "@types/uuid": "^10.0.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^20.11.24",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
   }
 }

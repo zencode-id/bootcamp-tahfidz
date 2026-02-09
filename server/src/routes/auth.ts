@@ -219,6 +219,9 @@ auth.get("/me", authMiddleware, async (c) => {
       address: user.address,
       parentId: user.parentId,
       createdAt: user.createdAt,
+
+      // Teacher Profile Data
+      ...(await db.teacherProfiles.findFirst({ userId: user.id }))
     },
   });
 });
@@ -263,6 +266,9 @@ auth.put(
         updatedAt: new Date().toISOString(),
     });
 
+    // Update teacher profile
+    await updateTeacherProfile(user.id, body);
+
     return c.json({
       success: true,
       message: "Profile updated successfully",
@@ -272,11 +278,33 @@ auth.put(
         email: updatedUser.email,
         role: updatedUser.role,
         phone: updatedUser.phone,
+        phone: updatedUser.phone,
         address: updatedUser.address,
       },
     });
   },
 );
+
+// Helper to update teacher profile
+async function updateTeacherProfile(userId: string, body: any) {
+  if (body.nip || body.specialization || body.startDate || body.totalHafalan) {
+      const existing = await db.teacherProfiles.findFirst({ userId });
+
+      const profileData = {
+          userId,
+          nip: body.nip,
+          specialization: body.specialization,
+          startDate: body.startDate,
+          totalHafalan: body.totalHafalan ? Number(body.totalHafalan) : undefined,
+      };
+
+      if (existing) {
+          await db.teacherProfiles.update(existing.id, profileData);
+      } else {
+          await db.teacherProfiles.create(profileData);
+      }
+  }
+}
 
 // ============================================
 // ADMIN ROUTES
@@ -382,6 +410,9 @@ auth.post("/users", authMiddleware, adminOnly, async (c) => {
     parentId: body.parentId || null,
   });
 
+  // Create teacher profile if fields exist
+  await updateTeacherProfile(newUser.id, body);
+
   const { password, ...safeUser } = newUser;
 
   return c.json(
@@ -408,9 +439,15 @@ auth.get("/users/:id", authMiddleware, adminOnly, async (c) => {
 
   const { password, ...safeUser } = user;
 
+  // Fetch teacher profile
+  const teacherProfile = await db.teacherProfiles.findFirst({ userId: id });
+
   return c.json({
     success: true,
-    data: safeUser,
+    data: {
+        ...safeUser,
+        ...teacherProfile
+    },
   });
 });
 
@@ -453,6 +490,9 @@ auth.put(
         ...body,
         updatedAt: new Date().toISOString(),
     });
+
+    // Update teacher profile
+    await updateTeacherProfile(id, body);
 
     return c.json({
       success: true,
@@ -497,6 +537,9 @@ auth.patch(
         updatedAt: new Date().toISOString(),
     });
 
+    // Update teacher profile
+    await updateTeacherProfile(id, body);
+
     return c.json({
       success: true,
       message: "User updated successfully",
@@ -538,3 +581,24 @@ auth.delete("/users/:id", authMiddleware, adminOnly, async (c) => {
 });
 
 export default auth;
+
+// Helper to update teacher profile
+async function updateTeacherProfile(userId: string, body: any) {
+  if (body.nip || body.specialization || body.startDate || body.totalHafalan) {
+      const existing = await db.teacherProfiles.findFirst({ userId });
+
+      const profileData = {
+          userId,
+          nip: body.nip,
+          specialization: body.specialization,
+          startDate: body.startDate,
+          totalHafalan: body.totalHafalan ? Number(body.totalHafalan) : undefined,
+      };
+
+      if (existing) {
+          await db.teacherProfiles.update(existing.id, profileData);
+      } else {
+          await db.teacherProfiles.create(profileData);
+      }
+  }
+}

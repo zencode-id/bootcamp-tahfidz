@@ -1,198 +1,153 @@
-import { HTTPException } from "hono/http-exception";
-import dotenv from "dotenv";
+import Database from "better-sqlite3";
+import { nanoid } from "nanoid";
+import fs from "node:fs";
 
-dotenv.config();
-
-/**
- * CONFIGURATION
- */
-const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-
-if (!GAS_WEBHOOK_URL) {
-  console.warn("WARNING: GAS_WEBHOOK_URL is not defined in environment variables.");
+// Ensure data directory exists
+if (!fs.existsSync("./data")) {
+  fs.mkdirSync("./data");
 }
 
-type Action = "create" | "update" | "delete" | "read";
+const sqlite = new Database("./data/tahfidz.db");
 
-interface GASRequest {
-    action?: Action;
-    table?: string;
-    data?: any;
-    query?: any;
-    limit?: number;
-    apiKey?: string;
-    items?: any[];
+// Initialize tables
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL,
+    isActive INTEGER DEFAULT 1,
+    phone TEXT,
+    address TEXT,
+    parentId TEXT,
+    createdAt TEXT,
+    updatedAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS teacher_profiles (
+    id TEXT PRIMARY KEY,
+    userId TEXT UNIQUE NOT NULL,
+    nip TEXT,
+    specialization TEXT,
+    startDate TEXT,
+    totalHafalan INTEGER,
+    photoUrl TEXT,
+    createdAt TEXT,
+    updatedAt TEXT,
+    FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS otp_codes (
+    id TEXT PRIMARY KEY,
+    userId TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expiresAt INTEGER NOT NULL,
+    createdAt TEXT
+  );
+`);
+
+// Generic Table Helper
+class Table<T> {
+  constructor(private tableName: string) {}
+
+  async findFirst(where: Partial<T>): Promise<T | null> {
+    const keys = Object.keys(where);
+    if (keys.length === 0) return null;
+    const condition = keys.map(k => `${k} = ?`).join(" AND ");
+    const values = Object.values(where);
+    const row = sqlite.prepare(`SELECT * FROM ${this.tableName} WHERE ${condition} LIMIT 1`).get(...values);
+
+    // Normalize booleans for 'users'
+    if (row && this.tableName === 'users') {
+       (row as any).isActive = (row as any).isActive === 1;
+    }
+    return row as T || null;
+  }
+
+  async findMany(where: Partial<T>, limit = 100): Promise<T[]> {
+    let query = `SELECT * FROM ${this.tableName}`;
+    const keys = Object.keys(where);
+    const values = Object.values(where);
+
+    if (keys.length > 0) {
+      const condition = keys.map(k => `${k} = ?`).join(" AND ");
+      query += ` WHERE ${condition}`;
+    }
+
+    query += ` LIMIT ?`;
+    const rows = sqlite.prepare(query).all(...values, limit);
+
+    if (this.tableName === 'users') {
+        return rows.map((r: any) => ({ ...r, isActive: r.isActive === 1 })) as T[];
+    }
+    return rows as T[];
+  }
+
+  async create(data: any): Promise<T> {
+    const id = data.id || nanoid();
+    const now = new Date().toISOString();
+    const finalData = { ...data, id, createdAt: now, updatedAt: now };
+
+    if (this.tableName === 'users') {
+        finalData.isActive = finalData.isActive ? 1 : 0;
+    }
+
+    const keys = Object.keys(finalData);
+    const placeholders = keys.map(() => "?").join(", ");
+    const values = Object.values(finalData);
+
+    const stmt = sqlite.prepare(`INSERT INTO ${this.tableName} (${keys.join(", ")}) VALUES (${placeholders})`);
+    stmt.run(...values);
+
+    // Return the created object
+    // Re-construct boolean
+    if (this.tableName === 'users') {
+        const { isActive, ...rest } = finalData;
+        return { ...rest, isActive: !!isActive } as T;
+    }
+    return finalData as T;
+  }
+
+  async update(id: string, data: Partial<T>): Promise<T> {
+     const now = new Date().toISOString();
+     const finalData = { ...data, updatedAt: now };
+
+     if (this.tableName === 'users' && (finalData as any).isActive !== undefined) {
+         (finalData as any).isActive = (finalData as any).isActive ? 1 : 0;
+     }
+
+     const keys = Object.keys(finalData);
+     const setClause = keys.map(k => `${k} = ?`).join(", ");
+     const values = Object.values(finalData);
+
+     const stmt = sqlite.prepare(`UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`);
+     stmt.run(...values, id);
+
+     // Fetch updated
+     return this.findFirst({ id } as any) as Promise<T>;
+  }
+
+  async delete(id: string): Promise<boolean> {
+      const stmt = sqlite.prepare(`DELETE FROM ${this.tableName} WHERE id = ?`);
+      const info = stmt.run(id);
+      return info.changes > 0;
+  }
 }
 
-interface GASResponse<T = any> {
-    success: boolean;
-    message?: string;
-    data?: T;
-    errors?: any[];
-}
-
-/**
- * Generic Client for Google Apps Script Webhook
- */
-export class GASClient {
-    private tableName: string;
-
-    constructor(tableName: string) {
-        this.tableName = tableName;
-    }
-
-    private async fetchGAS(payload: GASRequest): Promise<GASResponse> {
-        if (!GAS_WEBHOOK_URL) {
-             throw new HTTPException(500, { message: "Server misconfiguration: GAS_WEBHOOK_URL missing" });
-        }
-
-        try {
-             // Add API Key to payload
-            const response = await fetch(GAS_WEBHOOK_URL, {
-                method: "POST",
-                redirect: "follow",
-                headers: {
-                    "Content-Type": "text/plain",
-                    "X-API-Key": GAS_API_KEY || "",
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const text = await response.text();
-
-            let json;
-            try {
-                json = JSON.parse(text);
-            } catch (e) {
-                console.error("GAS RAW RESPONSE:", text);
-                throw new Error(`Failed to parse GAS response: ${text.substring(0, 100)}...`);
-            }
-
-            if (!response.ok) {
-                throw new Error(`GAS Error ${response.status}: ${JSON.stringify(json)}`);
-            }
-
-            return json;
-
-        } catch (error: any) {
-            console.error("GAS Fetch Error:", error.message);
-            throw new HTTPException(502, { message: "Database Service Unavailable" });
-        }
-    }
-
-    /**
-     * Find many records matching a query
-     */
-    async findMany(query: Record<string, any> = {}, limit: number = 100): Promise<any[]> {
-        const response = await this.fetchGAS({
-            action: "read",
-            table: this.tableName,
-            query: query,
-             limit: limit
-        });
-
-        if (!response.success) {
-            console.error(`FindMany Error on ${this.tableName}:`, response.message);
-            return [];
-        }
-
-        return response.data || [];
-    }
-
-    /**
-     * Find a single record matching a query
-     */
-    async findFirst(query: Record<string, any>): Promise<any | null> {
-         const results = await this.findMany(query, 1);
-         return results.length > 0 ? results[0] : null;
-    }
-
-    /**
-     * Create a new record
-     */
-    async create(data: Record<string, any>): Promise<any> {
-        // Ensure ID
-        if (!data.id) {
-             const { v4: uuidv4 } = await import('uuid');
-             data.id = uuidv4();
-        }
-
-        // Add timestamps
-        const now = new Date().toISOString();
-        if (!data.createdAt) data.createdAt = now;
-        if (!data.updatedAt) data.updatedAt = now;
-
-        // Wrap in items array for Code.gs compatibility
-        const response = await this.fetchGAS({
-            items: [{
-                action: "create",
-                table: this.tableName,
-                data: data
-            }]
-        });
-
-        if (!response.success) {
-             throw new Error(response.message || "Failed to create record");
-        }
-
-        return data;
-    }
-
-    /**
-     * Update a record
-     */
-    async update(id: string, data: Record<string, any>): Promise<any> {
-         // Add timestamps
-        const now = new Date().toISOString();
-        data.updatedAt = now;
-        data.id = id; // Ensure ID is present
-
-        const response = await this.fetchGAS({
-             items: [{
-                action: "update",
-                table: this.tableName,
-                data: data
-            }]
-        });
-
-         if (!response.success) {
-             throw new Error(response.message || "Failed to update record");
-        }
-
-        return { id, ...data };
-    }
-
-    /**
-      * Delete a record
-      */
-    async delete(id: string): Promise<boolean> {
-         const response = await this.fetchGAS({
-             items: [{
-                 action: "delete",
-                 table: this.tableName,
-                 data: { id }
-             }]
-         });
-
-         return response.success;
-    }
-}
-
-/**
- * Accessor for different "tables"
- */
+// Export db object matching GAS interface
 export const db = {
-    users: new GASClient("users"),
-    classes: new GASClient("classes"),
-    attendance: new GASClient("attendance"),
-    memorizationLogs: new GASClient("memorization_logs"),
-    assessments: new GASClient("assessments"),
-    exams: new GASClient("exams"),
-    examResults: new GASClient("exam_results"),
-    reports: new GASClient("reports"),
-    classMembers: new GASClient("class_members"),
-    otpCodes: new GASClient("otp_codes"),
-    syncLogs: new GASClient("sync_logs"),
-    dataQuran: new GASClient("data_quran"), // Access 114 Surahs
+  users: new Table("users"),
+  otpCodes: new Table("otp_codes"),
+  teacherProfiles: new Table("teacher_profiles"),
+  // Mock tables for other routes
+  classes: new Table("classes"),
+  assessments: new Table("assessments"),
+  dataQuran: new Table("data_quran"),
+  exams: new Table("exams"),
+  students: new Table("students"),
+  reports: new Table("reports"),
+  stats: new Table("stats"),
+  sync: new Table("sync"),
+  notifications: new Table("notifications"),
 };
