@@ -22,3 +22,15 @@ export interface TeacherProfile {
   totalHafalan?: number;
   photoUrl?: string;
 }
+
+export interface SchoolProfile {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

@@ -16,6 +16,7 @@ import classRoutes from "./routes/classes.js";
 import examRoutes from "./routes/exams.js";
 import reportRoutes from "./routes/reports.js";
 import uploadRoutes from "./routes/upload.js";
+import schoolRoutes from "./routes/school.js";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { db } from "./lib/gasClient.js";
 
@@ -169,9 +170,10 @@ app.route("/sync/tahfidz", tahfidzRoutes);
 app.route("/stats", statsRoutes);
 app.route("/classes", classRoutes);
 app.route("/exams", examRoutes);
-app.route("/reports", reportRoutes);
+
 app.route("/reports", reportRoutes);
 app.route("/upload", uploadRoutes);
+app.route("/school", schoolRoutes);
 // app.route("/webhook", webhookRoutes);
 
 // Serve static files from uploads directory

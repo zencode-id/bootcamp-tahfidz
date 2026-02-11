@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { nanoid } from "nanoid";
 import fs from "node:fs";
+import { User, SchoolProfile } from "../types/index.js";
 
 // Ensure data directory exists
 if (!fs.existsSync("./data")) {
@@ -44,6 +45,18 @@ sqlite.exec(`
     code TEXT NOT NULL,
     expiresAt INTEGER NOT NULL,
     createdAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS school_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    website TEXT,
+    logoUrl TEXT,
+    createdAt TEXT,
+    updatedAt TEXT
   );
 `);
 
@@ -150,4 +163,5 @@ export const db = {
   stats: new Table("stats"),
   sync: new Table("sync"),
   notifications: new Table("notifications"),
+  schoolProfiles: new Table<SchoolProfile>("school_profiles"),
 };
